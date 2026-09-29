@@ -1,0 +1,301 @@
+clear
+clc
+close all
+
+% CONSTANTS
+g0 = 9.80665;
+mu = 3.986e14;
+Re = 6371e3;
+
+rho0 = 1.225;
+H = 8500;
+
+Cd = 0.5;
+diameter = 3.5;
+A = pi*(diameter/2)^2;
+
+
+% VEHICLE MASSES
+dryMass = 22000;
+propMass = 18000;
+
+payload_old = 4000;
+payload_new = 6000;
+
+m_old = dryMass + propMass + payload_old;
+m0 = dryMass + propMass + payload_new;
+
+emptyMass = dryMass + payload_new;
+
+
+% ORIGINAL ENGINE
+T0 = 650000;
+Isp0 = 285;
+
+
+% THREE CASES
+% 1 = original
+% 2 = 20% more thrust
+% 3 = 20% more Isp
+
+T = [T0 1.2*T0 T0];
+
+Isp = [Isp0 Isp0 1.2*Isp0];
+
+names = {'Original','Higher thrust','Higher Isp'};
+
+
+% SIMULATION TIME
+dt = 0.1;
+tf = 30;
+
+time = 0:dt:tf;
+
+N = length(time);
+
+
+% --------------------------------------------------------
+% SIMPLE ANALYTICAL CALCULATIONS BEFORE SIMULATION
+% --------------------------------------------------------
+
+g_ground = mu/Re^2;
+
+a_old_payload = (T0 - m_old*g_ground)/m_old;
+a_new_payload = (T0 - m0*g_ground)/m0;
+
+fprintf('Original acceleration before payload increase = %.2f m/s^2\n', ...
+    a_old_payload)
+
+fprintf('Original acceleration after payload increase  = %.2f m/s^2\n\n', ...
+    a_new_payload)
+
+
+for c = 1:3
+
+    mdot(c) = T(c)/(Isp(c)*g0);
+
+    burnTime(c) = propMass/mdot(c);
+
+    initialAccel(c) = (T(c) - m0*g_ground)/m0;
+
+    TW(c) = T(c)/(m0*g_ground);
+
+    propPrediction(c) = mdot(c)*tf;
+
+    fprintf('%s\n',names{c})
+    fprintf('Thrust = %.0f kN\n',T(c)/1000)
+    fprintf('Isp = %.1f s\n',Isp(c))
+    fprintf('Mass flow = %.2f kg/s\n',mdot(c))
+    fprintf('Burn time = %.2f s\n',burnTime(c))
+    fprintf('Initial acceleration = %.2f m/s^2\n',initialAccel(c))
+    fprintf('Initial T/W = %.2f\n',TW(c))
+    fprintf('Predicted propellant in 30 s = %.2f kg\n\n', ...
+        propPrediction(c))
+
+end
+
+
+% Make sure 30 seconds is inside powered flight
+if tf > min(burnTime)
+    warning('Simulation time is longer than one of the burn times')
+end
+
+
+% MATRICES TO SAVE RESULTS
+H_all = zeros(N,3);
+V_all = zeros(N,3);
+A_all = zeros(N,3);
+M_all = zeros(N,3);
+Q_all = zeros(N,3);
+
+
+% --------------------------------------------------------
+% SIMULATION
+% --------------------------------------------------------
+
+for c = 1:3
+
+    h = zeros(N,1);
+    v = zeros(N,1);
+    a = zeros(N,1);
+    m = zeros(N,1);
+    q = zeros(N,1);
+
+    % release from rest
+    h(1) = 0;
+    v(1) = 0;
+    m(1) = m0;
+
+
+    for i = 1:N-1
+
+        % local gravity
+        g = mu/(Re + h(i))^2;
+
+        % atmospheric density
+        rho = rho0*exp(-h(i)/H);
+
+        % dynamic pressure
+        q(i) = 0.5*rho*v(i)^2;
+
+        % drag magnitude
+        drag = q(i)*Cd*A;
+
+
+        % engine still burning?
+        if m(i) > emptyMass
+
+            thrust = T(c);
+            flow = mdot(c);
+
+        else
+
+            thrust = 0;
+            flow = 0;
+
+        end
+
+
+        % drag must oppose the velocity
+        if v(i) > 0
+
+            dragForce = -drag;
+
+        elseif v(i) < 0
+
+            dragForce = drag;
+
+        else
+
+            dragForce = 0;
+
+        end
+
+
+        % gravity force
+        weight = m(i)*g;
+
+        % total force
+        totalForce = thrust - weight + dragForce;
+
+        % acceleration
+        a(i) = totalForce/m(i);
+
+
+        % FORWARD EULER
+        h(i+1) = h(i) + v(i)*dt;
+
+        v(i+1) = v(i) + a(i)*dt;
+
+        m(i+1) = m(i) - flow*dt;
+
+
+        % do not use more propellant than we have
+        if m(i+1) < emptyMass
+            m(i+1) = emptyMass;
+        end
+
+    end
+
+
+    % values for final sample
+    g = mu/(Re + h(end))^2;
+
+    rho = rho0*exp(-h(end)/H);
+
+    q(end) = 0.5*rho*v(end)^2;
+
+    drag = q(end)*Cd*A;
+
+
+    if m(end) > emptyMass
+        thrust = T(c);
+    else
+        thrust = 0;
+    end
+
+
+    if v(end) >= 0
+        dragForce = -drag;
+    else
+        dragForce = drag;
+    end
+
+    a(end) = (thrust - m(end)*g + dragForce)/m(end);
+
+
+    % save results
+    H_all(:,c) = h;
+    V_all(:,c) = v;
+    A_all(:,c) = a;
+    M_all(:,c) = m;
+    Q_all(:,c) = q;
+
+end
+
+
+% --------------------------------------------------------
+% FINAL RESULTS
+% --------------------------------------------------------
+
+fprintf('\nFINAL RESULTS AFTER %.0f SECONDS\n\n',tf)
+
+for c = 1:3
+
+    propUsed = m0 - M_all(end,c);
+
+    fprintf('%s\n',names{c})
+
+    fprintf('Altitude = %.1f m\n',H_all(end,c))
+
+    fprintf('Velocity = %.1f m/s\n',V_all(end,c))
+
+    fprintf('Acceleration = %.2f m/s^2\n',A_all(end,c))
+
+    fprintf('Propellant used = %.1f kg\n\n',propUsed)
+
+end
+
+
+% --------------------------------------------------------
+% PLOTS
+% --------------------------------------------------------
+
+figure
+plot(time,H_all(:,1),time,H_all(:,2),time,H_all(:,3))
+xlabel('Time [s]')
+ylabel('Altitude [m]')
+legend(names)
+grid on
+
+
+figure
+plot(time,V_all(:,1),time,V_all(:,2),time,V_all(:,3))
+xlabel('Time [s]')
+ylabel('Velocity [m/s]')
+legend(names)
+grid on
+
+
+figure
+plot(time,A_all(:,1),time,A_all(:,2),time,A_all(:,3))
+xlabel('Time [s]')
+ylabel('Acceleration [m/s^2]')
+legend(names)
+grid on
+
+
+figure
+plot(time,m0-M_all(:,1),time,m0-M_all(:,2),time,m0-M_all(:,3))
+xlabel('Time [s]')
+ylabel('Propellant used [kg]')
+legend(names)
+grid on
+
+
+figure
+plot(time,Q_all(:,1),time,Q_all(:,2),time,Q_all(:,3))
+xlabel('Time [s]')
+ylabel('Dynamic pressure [Pa]')
+legend(names)
+grid on
