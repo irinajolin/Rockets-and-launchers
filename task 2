@@ -1,0 +1,287 @@
+clear;
+clc;
+close all;
+
+% CONSTANTS
+g0 = 9.81;             % Gravity [m/s^2]
+rho0 = 1.225;          % Air density at sea level [kg/m^3]
+H = 9500;              % Atmospheric scale height [m]
+Cd = 0.20;             % Drag coefficient
+
+% VEHICLE
+m0 = 115000;           % Initial mass [kg]
+diameter = 3.5;        % Rocket diameter (el suposem nosaltres)
+
+A_original = pi*(diameter/2)^2;    % Original reference area 
+A_higher = 1.30*A_original;        % 30% larger area
+
+% ENGINE (mateixos valors que a la task 1)
+T = 1.30e6;            
+Isp = 300;             
+
+% MASS FLOW RATE
+mdot = T / (Isp * g0);
+
+% TIME
+dt = 0.1; 
+t = 0:dt:20;% creem un vector de temps desde 0s fins 20s avançant de 0.1s
+N = length(t); % conta quans valors té el vector t
+
+% INITIALIZE VARIABLES
+m1 = zeros(1,N); % area original
+m2 = zeros(1,N); % area més gran
+m3 = zeros(1,N); % no atmosfera 
+
+a1 = zeros(1,N);
+a2 = zeros(1,N);
+a3 = zeros(1,N);
+
+v1 = zeros(1,N); % com tots els vectors començen a 0  v1(1)=0, el que vol dir que el cohet es llibera desde el repós
+v2 = zeros(1,N);
+v3 = zeros(1,N);
+% altituds, al principi h0=0
+h1 = zeros(1,N); 
+h2 = zeros(1,N);
+h3 = zeros(1,N);
+
+rho1 = zeros(1,N); % guardem la densitat atmosferica en cada instant
+rho2 = zeros(1,N);
+rho3 = zeros(1,N);
+
+q1 = zeros(1,N); % dynamic pressure 
+q2 = zeros(1,N);
+q3 = zeros(1,N);
+
+D1 = zeros(1,N); % drag
+D2 = zeros(1,N);
+D3 = zeros(1,N);
+
+% INITIAL MASS
+m1(1) = m0; % indiquem que els tres casos començen amb la mateixa massa perq volem fer una controlled comparison, no volem cambiar area i masa alhora, nomes cambia l'aerodinamica
+m2(1) = m0;
+m3(1) = m0;
+
+% SAME PHYSICAL STATE COMPARISON
+h_test = 1000;         % Altitud de prova , punt on comparem
+v_test = 100;          % Velocitat de prova
+
+rho_test = rho0 * exp(-h_test/H); % calculem la densitat a hprova
+
+q_test = 0.5 * rho_test * v_test^2; % calculem la dynamic pressure de prova, com estem fent servir la mateixa altitud densitat i velocitat aquesta ha de ser igual per els dos vehicles 
+
+D_original_test = q_test * Cd * A_original; % drag amb area original
+
+D_higher_test = q_test * Cd * A_higher; % drag amb area més gran
+
+dragIncrease = 100*(D_higher_test - D_original_test)/D_original_test; % calculem l'augment en %
+
+fprintf('SAME PHYSICAL STATE COMPARISON\n')
+fprintf('Altitude: %.0f m\n', h_test)
+fprintf('Velocity: %.0f m/s\n', v_test)
+fprintf('Dynamic pressure: %.2f Pa\n\n', q_test)
+
+fprintf('Original area: %.2f m^2\n', A_original)
+fprintf('Higher area: %.2f m^2\n\n', A_higher)
+
+fprintf('Original drag: %.2f N\n', D_original_test)
+fprintf('Higher drag: %.2f N\n', D_higher_test)
+fprintf('Drag increase: %.2f %%\n\n', dragIncrease)
+
+% SIMULATION
+for i = 1:N-1 % repetim tots els calculs per a cada instant de temps 
+
+    % CASE 1 - ORIGINAL AREA
+
+    rho1(i) = rho0 * exp(-h1(i)/H); % densitat en funció de la altitud actual
+    q1(i) = 0.5 * rho1(i) * v1(i)^2;
+    D1(i) = q1(i) * Cd * A_original;
+    a1(i) = (T - m1(i)*g0 - D1(i)) / m1(i);
+    v1(i+1) = v1(i) + a1(i)*dt; % forward euler
+    h1(i+1) = h1(i) + v1(i)*dt;
+    m1(i+1) = m1(i) - mdot*dt; % consum de propellant, el cohet perd masa
+
+    % CASE 2 - HIGHER AREA
+
+    rho2(i) = rho0 * exp(-h2(i)/H);
+    q2(i) = 0.5 * rho2(i) * v2(i)^2;
+    D2(i) = q2(i) * Cd * A_higher;
+    a2(i) = (T - m2(i)*g0 - D2(i)) / m2(i);
+    v2(i+1) = v2(i) + a2(i)*dt;
+    h2(i+1) = h2(i) + v2(i)*dt;
+    m2(i+1) = m2(i) - mdot*dt;
+
+    % CASE 3 - NO ATMOSPHERE
+
+    rho3(i) = 0; % eliminem completament l'atmosfera
+    q3(i) = 0.5 * rho3(i) * v3(i)^2;
+    D3(i) = q3(i) * Cd * A_original;
+    a3(i) = (T - m3(i)*g0 - D3(i)) / m3(i);
+    v3(i+1) = v3(i) + a3(i)*dt;
+    h3(i+1) = h3(i) + v3(i)*dt;
+    m3(i+1) = m3(i) - mdot*dt;
+
+end
+
+% LAST VALUES
+% ho fer pq en el bucle nomes hem fet fins n-1, calculem el
+% ultim punto explicitament
+%cas 1 (original)
+rho1(end) = rho0 * exp(-h1(end)/H); % ultima posició del vector
+q1(end) = 0.5 * rho1(end) * v1(end)^2;
+D1(end) = q1(end) * Cd * A_original;
+a1(end) = (T - m1(end)*g0 - D1(end)) / m1(end);
+
+%cas 2 (higher A)
+rho2(end) = rho0 * exp(-h2(end)/H);
+q2(end) = 0.5 * rho2(end) * v2(end)^2;
+D2(end) = q2(end) * Cd * A_higher;
+a2(end) = (T - m2(end)*g0 - D2(end)) / m2(end);
+
+%cas3 (no atm)
+rho3(end) = 0;
+q3(end) = 0;
+D3(end) = 0;
+a3(end) = (T - m3(end)*g0) / m3(end);
+
+% PROPELLANT USED
+
+prop1 = m0 - m1;
+prop2 = m0 - m2;
+prop3 = m0 - m3;
+
+% RESULTS
+
+fprintf('FINAL RESULTS AFTER %.0f SECONDS\n\n', t(end))
+
+fprintf('ORIGINAL AREA\n')
+fprintf('Altitude: %.2f m\n', h1(end))
+fprintf('Velocity: %.2f m/s\n', v1(end))
+fprintf('Acceleration: %.2f m/s^2\n', a1(end))
+fprintf('Maximum drag: %.2f N\n', max(D1))
+fprintf('Maximum dynamic pressure: %.2f Pa\n\n', max(q1))
+
+fprintf('HIGHER AREA\n')
+fprintf('Altitude: %.2f m\n', h2(end))
+fprintf('Velocity: %.2f m/s\n', v2(end))
+fprintf('Acceleration: %.2f m/s^2\n', a2(end))
+fprintf('Maximum drag: %.2f N\n', max(D2))
+fprintf('Maximum dynamic pressure: %.2f Pa\n\n', max(q2))
+
+fprintf('NO ATMOSPHERE\n')
+fprintf('Altitude: %.2f m\n', h3(end))
+fprintf('Velocity: %.2f m/s\n', v3(end))
+fprintf('Acceleration: %.2f m/s^2\n', a3(end))
+fprintf('Maximum drag: %.2f N\n', max(D3))
+fprintf('Maximum dynamic pressure: %.2f Pa\n\n', max(q3))
+
+% PERCENTAGE DIFFERENCES
+
+altitudeDifference = 100*(h2(end)-h1(end))/h1(end);
+
+velocityDifference = 100*(v2(end)-v1(end))/v1(end);
+
+fprintf('EFFECT OF THE LARGER AREA\n')
+fprintf('Altitude difference: %.2f %%\n', altitudeDifference)
+fprintf('Velocity difference: %.2f %%\n\n', velocityDifference)
+
+% GRAPH 1 - ACCELERATION
+
+figure
+
+plot(t,a1,'LineWidth',1.5)
+hold on
+plot(t,a2,'LineWidth',1.5)
+plot(t,a3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Acceleration [m/s^2]')
+title('Acceleration')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
+
+% GRAPH 2 - VELOCITY
+
+figure
+
+plot(t,v1,'LineWidth',1.5)
+hold on
+plot(t,v2,'LineWidth',1.5)
+plot(t,v3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Velocity [m/s]')
+title('Velocity')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
+
+% GRAPH 3 - ALTITUDE
+
+figure
+
+plot(t,h1,'LineWidth',1.5)
+hold on
+plot(t,h2,'LineWidth',1.5)
+plot(t,h3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Altitude [m]')
+title('Altitude')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
+
+% GRAPH 4 - DRAG
+
+figure
+
+plot(t,D1,'LineWidth',1.5)
+hold on
+plot(t,D2,'LineWidth',1.5)
+plot(t,D3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Drag [N]')
+title('Drag force')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
+
+% GRAPH 5 - DYNAMIC PRESSURE
+
+figure
+
+plot(t,q1,'LineWidth',1.5)
+hold on
+plot(t,q2,'LineWidth',1.5)
+plot(t,q3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Dynamic pressure [Pa]')
+title('Dynamic pressure')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
+
+% GRAPH 6 - PROPELLANT USED
+
+figure
+
+plot(t,prop1,'LineWidth',1.5)
+hold on
+plot(t,prop2,'LineWidth',1.5)
+plot(t,prop3,'LineWidth',1.5)
+
+xlabel('Time [s]')
+ylabel('Propellant used [kg]')
+title('Propellant consumption')
+
+legend('Original area','Higher area','No atmosphere')
+
+grid on
