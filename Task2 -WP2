@@ -1,0 +1,371 @@
+function task2_gui
+
+clc;
+close all;
+
+% CONSTANTS
+RE = 6374.2e3;      % Earth radius [m]
+mu = 3.986e14;      % Earth gravitational parameter [m^3/s^2]
+
+savedCases = struct([]);
+caseNumber = 0;
+current = struct();
+
+
+% WINDOW
+fig = uifigure('Name','Task 2 - Insertion claim',...
+               'Position',[100 50 1200 800]);
+
+ax = uiaxes(fig,'Position',[360 220 810 550]);
+xlabel(ax,'x [km]')
+ylabel(ax,'y [km]')
+title(ax,'Coast trajectories - no thrust and no atmosphere')
+grid(ax,'on')
+axis(ax,'equal')
+
+
+% SLIDERS
+
+labelH = uilabel(fig,'Position',[20 745 300 22]);
+sliderH = uislider(fig,'Position',[20 725 300 3],...
+    'Limits',[150 1000],'Value',572);
+
+labelGamma = uilabel(fig,'Position',[20 655 300 22]);
+sliderGamma = uislider(fig,'Position',[20 635 300 3],...
+    'Limits',[-90 90],'Value',0);
+
+labelTime = uilabel(fig,'Position',[20 565 300 22]);
+sliderTime = uislider(fig,'Position',[20 545 300 3],...
+    'Limits',[20 180],'Value',100);
+
+labelDt = uilabel(fig,'Position',[20 475 300 22]);
+sliderDt = uislider(fig,'Position',[20 455 300 3],...
+    'Limits',[0.5 10],'Value',1);
+
+
+% RESULTS LABELS
+
+labelVc = uilabel(fig,'Position',[20 400 320 22]);
+labelVr = uilabel(fig,'Position',[20 375 320 22]);
+labelVt = uilabel(fig,'Position',[20 350 320 22]);
+labelE = uilabel(fig,'Position',[20 325 320 22]);
+labelPerigee = uilabel(fig,'Position',[20 300 320 22]);
+labelApogee = uilabel(fig,'Position',[20 275 320 22]);
+
+labelOrbit = uilabel(fig,'Position',[20 250 320 22]);
+labelOrbit.FontWeight = 'bold';
+
+
+% BUTTONS
+
+saveButton = uibutton(fig,'push',...
+    'Position',[20 200 140 35],...
+    'Text','SAVE CASE',...
+    'ButtonPushedFcn',@saveCase);
+
+clearButton = uibutton(fig,'push',...
+    'Position',[180 200 140 35],...
+    'Text','CLEAR CASES',...
+    'ButtonPushedFcn',@clearCases);
+
+
+% TABLE
+
+tableResults = uitable(fig,...
+    'Position',[20 20 1150 155]);
+
+tableResults.ColumnName = {...
+    'Case','Gamma [deg]','Vc [km/s]',...
+    'Vr [km/s]','Vt [km/s]','e',...
+    'Perigee [km]','Apogee [km]',...
+    'Orbit type','Energy error [%]','h error [%]'};
+
+
+% SLIDER CALLBACKS
+
+sliderH.ValueChangedFcn = @updateCurrent;
+sliderGamma.ValueChangedFcn = @updateCurrent;
+sliderTime.ValueChangedFcn = @updateCurrent;
+sliderDt.ValueChangedFcn = @updateCurrent;
+
+updateCurrent();
+
+
+
+% ---------------------------------------------------------
+% UPDATE CURRENT CASE
+% ---------------------------------------------------------
+
+function updateCurrent(~,~)
+
+    hTarget = sliderH.Value*1000;
+    gamma = sliderGamma.Value;
+    coastTime = sliderTime.Value*60;
+    dt = sliderDt.Value;
+
+    labelH.Text = sprintf('Target altitude = %.0f km',sliderH.Value);
+    labelGamma.Text = sprintf('Gamma = %.1f deg',gamma);
+    labelTime.Text = sprintf('Coast time = %.0f min',sliderTime.Value);
+    labelDt.Text = sprintf('dt = %.1f s',dt);
+
+    current = calculateCase(hTarget,gamma,coastTime,dt);
+
+    labelVc.Text = sprintf('Circular speed = %.3f km/s',current.Vc/1000);
+    labelVr.Text = sprintf('Radial velocity = %.3f km/s',current.Vr/1000);
+    labelVt.Text = sprintf('Tangential velocity = %.3f km/s',current.Vt/1000);
+    labelE.Text = sprintf('Eccentricity = %.4f',current.e);
+    labelPerigee.Text = sprintf('Perigee altitude = %.1f km',current.hp);
+    labelApogee.Text = sprintf('Apogee altitude = %.1f km',current.ha);
+    labelOrbit.Text = ['Orbit type: ' current.orbitType];
+
+    drawPlot();
+
+end
+
+
+
+% ---------------------------------------------------------
+% CALCULATE ONE CASE
+% ---------------------------------------------------------
+
+function data = calculateCase(hTarget,gamma,coastTime,dt)
+
+    r0 = RE + hTarget;
+
+    % Circular speed
+    Vc = sqrt(mu/r0);
+
+    % Velocity components
+    Vr = Vc*sind(gamma);
+    Vt = Vc*cosd(gamma);
+
+    % Orbital energy
+    energy0 = Vc^2/2 - mu/r0;
+
+    % Angular momentum
+    hOrb = r0*Vt;
+
+    % Semi-major axis
+    a = -mu/(2*energy0);
+
+    % Eccentricity
+    e = sqrt(1 + 2*energy0*hOrb^2/mu^2);
+
+    % Perigee and apogee
+    rp = a*(1-e);
+    ra = a*(1+e);
+
+    hp = (rp-RE)/1000;
+    ha = (ra-RE)/1000;
+
+    % Orbit type
+    if rp < RE
+        orbitType = 'Surface-intersecting';
+    elseif e < 0.001
+        orbitType = 'Circular';
+    else
+        orbitType = 'Elliptical';
+    end
+
+    % Coast propagation
+    [x,y,energy,hMomentum] = propagateCoast(r0,Vr,Vt,dt,coastTime);
+
+    % Numerical errors
+    energyError = max(abs((energy-energy(1))/energy(1)))*100;
+    hError = max(abs((hMomentum-hMomentum(1))/hMomentum(1)))*100;
+
+    % Save all results
+    data.gamma = gamma;
+    data.Vc = Vc;
+    data.Vr = Vr;
+    data.Vt = Vt;
+    data.e = e;
+    data.hp = hp;
+    data.ha = ha;
+    data.orbitType = orbitType;
+    data.energyError = energyError;
+    data.hError = hError;
+    data.x = x;
+    data.y = y;
+
+end
+
+
+
+% ---------------------------------------------------------
+% SAVE CASE
+% ---------------------------------------------------------
+
+function saveCase(~,~)
+
+    caseNumber = caseNumber + 1;
+
+    savedCases(caseNumber) = current;
+
+    updateTable();
+    drawPlot();
+
+end
+
+
+
+% ---------------------------------------------------------
+% CLEAR CASES
+% ---------------------------------------------------------
+
+function clearCases(~,~)
+
+    savedCases = struct([]);
+    caseNumber = 0;
+
+    tableResults.Data = {};
+
+    drawPlot();
+
+end
+
+
+
+% ---------------------------------------------------------
+% UPDATE TABLE
+% ---------------------------------------------------------
+
+function updateTable()
+
+    data = cell(caseNumber,11);
+
+    for j = 1:caseNumber
+
+        data(j,:) = {...
+            j,...
+            savedCases(j).gamma,...
+            savedCases(j).Vc/1000,...
+            savedCases(j).Vr/1000,...
+            savedCases(j).Vt/1000,...
+            savedCases(j).e,...
+            savedCases(j).hp,...
+            savedCases(j).ha,...
+            savedCases(j).orbitType,...
+            savedCases(j).energyError,...
+            savedCases(j).hError};
+
+    end
+
+    tableResults.Data = data;
+
+end
+
+
+
+% ---------------------------------------------------------
+% DRAW TRAJECTORIES
+% ---------------------------------------------------------
+
+function drawPlot()
+
+    cla(ax)
+    hold(ax,'on')
+    grid(ax,'on')
+    axis(ax,'equal')
+
+    % Earth
+    ang = linspace(0,2*pi,400);
+
+    plot(ax,...
+        RE*cos(ang)/1000,...
+        RE*sin(ang)/1000,...
+        'LineWidth',1.5,...
+        'DisplayName','Earth');
+
+    % Saved cases
+    for j = 1:caseNumber
+
+        plot(ax,...
+            savedCases(j).x/1000,...
+            savedCases(j).y/1000,...
+            'LineWidth',1.5,...
+            'DisplayName',...
+            sprintf('Saved %d: gamma = %.1f deg',...
+            j,savedCases(j).gamma));
+
+    end
+
+    % Current case
+    plot(ax,...
+        current.x/1000,...
+        current.y/1000,...
+        '--',...
+        'LineWidth',1.5,...
+        'DisplayName',...
+        sprintf('Current: gamma = %.1f deg',current.gamma));
+
+    xlabel(ax,'x [km]')
+    ylabel(ax,'y [km]')
+    title(ax,'Coast trajectories - no thrust and no atmosphere')
+    legend(ax,'Location','best')
+
+end
+
+
+
+% ---------------------------------------------------------
+% FORWARD EULER COAST
+% ---------------------------------------------------------
+
+function [x,y,energy,hMomentum] = propagateCoast(r0,Vr,Vt,dt,tEnd)
+
+    N = floor(tEnd/dt)+1;
+
+    x = zeros(1,N);
+    y = zeros(1,N);
+    vx = zeros(1,N);
+    vy = zeros(1,N);
+
+    % Initial state
+    x(1) = r0;
+    y(1) = 0;
+
+    vx(1) = Vr;
+    vy(1) = Vt;
+
+    lastPoint = N;
+
+    for i = 1:N-1
+
+        r = sqrt(x(i)^2 + y(i)^2);
+
+        % Gravity
+        axG = -mu*x(i)/r^3;
+        ayG = -mu*y(i)/r^3;
+
+        % Forward Euler
+        x(i+1) = x(i) + vx(i)*dt;
+        y(i+1) = y(i) + vy(i)*dt;
+
+        vx(i+1) = vx(i) + axG*dt;
+        vy(i+1) = vy(i) + ayG*dt;
+
+        % Impact
+        if sqrt(x(i+1)^2 + y(i+1)^2) <= RE
+            lastPoint = i+1;
+            break
+        end
+
+    end
+
+    % Remove unused values
+    x = x(1:lastPoint);
+    y = y(1:lastPoint);
+    vx = vx(1:lastPoint);
+    vy = vy(1:lastPoint);
+
+    % Energy and angular momentum
+    r = sqrt(x.^2 + y.^2);
+
+    energy = 0.5*(vx.^2 + vy.^2) - mu./r;
+
+    hMomentum = x.*vy - y.*vx;
+
+end
+
+end
