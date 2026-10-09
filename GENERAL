@@ -1,0 +1,117 @@
+%% WP1: CORE DYNAMICS - PLANTILLA DE CODI
+clear; clc; close all;
+
+%% 1. CONSTANTS FÍSIQUES I GEOMETRIA
+
+g0 = 9.80665;
+mu = 3.986e14;
+rE = 6371e3;
+rho0 = 1.225;
+H = 9500;
+Cd = 0.5;
+Cl = 0.5;
+d = 3.5;
+A = pi*(d/2)^2;
+pitch =  80;  % dada inventada
+
+%% 2. PARÀMETRES DEL VEHICLE I PROPULSIÓ
+dryMass = 22000;
+propMass = 18000;
+payload = 6000;
+m0 = dryMass + propMass + payload;
+m(1) = m0;
+emptyMass = dryMass + payload;
+
+
+T0 = 650000;      
+Isp0 = 285;       
+mdot = T0 / (Isp0 * g0);
+
+%% 4. CONFIGURACIÓ DE LA SIMULACIÓ I CONDICIONS INICIALS
+dt = 0.1;
+tf = 400;
+time = 0:dt:tf;
+N = length(time);
+
+r = zeros(N, 2);
+v = zeros(N, 2);
+h_actual = zeros(N, 1);
+
+v(1, :) = [0, 0];  
+r(1, :) = [0, rE];
+
+%% 5. BUCLE D'INTEGRACIÓ NUMÈRICA (FORWARD EULER)
+%VECTOR PERPENDICULAR A r ÉS LOCAL HORIOZN!!!!!!!!!
+%per trobar la direccio ferlo unitari i mutliplicar per magnitud
+%multipliquem per vector unitari per fer canvi de coordenades i qu ethrust
+%surti del coet 
+%drag en direccio de la velocitat
+
+
+for i = 2:(N-1)
+
+    h = norm(r(i-1, :)) - rE;
+    g = mu / (norm(r(i-1, :)))^2;
+    rho = rho0 * exp(-h/H);
+   
+    v_modul = norm(v(i-1, :));
+
+    u_r = r(i-1, :) / norm(r(i-1, :));
+    local_horizon = [-u_r(2), u_r(1)]; 
+    pitch_direction = cosd(pitch)*local_horizon + sind(pitch)*u_r; %canvi de coordenades centrades en coet
+    T = T0*pitch_direction;
+    
+    if v_modul > 0
+        u_v = v(i-1, :) / v_modul;
+        u_v_perp = [-u_v(2),u_v(1)];
+    else
+        u_v = [0, 0];
+        u_v_perp = [0,0];
+
+    end
+ 
+    if m(i-1)<= emptyMass
+        T = 0;
+        m(i) = m(i-1);
+    else
+        m(i) = m(i-1) - mdot*dt;
+    end
+
+    W = - m(i)* g *u_r; %weight en direcció avall
+    D = -0.5 * rho * v_modul^2 * Cd * A * u_v; %drag en sentit contrari a velocitat
+    L = -0.5 * rho * v_modul^2 * Cl * A * u_v_perp; %lift perpendicular a velocitat
+
+    F_total = T + W + D + L;
+    
+    a = F_total / m(i);
+
+    v(i, :) = v(i-1, :) + a*dt; 
+    r(i, :) = r(i-1, :) + v(i, :)*dt;
+    h_actual(i) = norm(r(i, :)) - rE;
+    
+    if h_actual(i) <= 0 && i>2
+        v(i, :) = [0, 0];
+        break
+    end     
+ 
+end
+
+%% 6. POST-PROCESSAT I REPRESENTACIÓ GRÀFICA
+
+figure;
+subplot(1,2,1)
+plot(time, h_actual, 'LineWidth',1.5)
+xlabel('Temps [s]')
+ylabel('Alçada [m]')
+title('Alçada vs Temps')
+grid on
+
+v_modul = vecnorm(v, 2, 2);
+
+subplot(1, 2, 2)
+plot(time, v_modul, 'r', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Velocitat [m/s]')
+title('Velocitat vs Temps')
+grid on
+
