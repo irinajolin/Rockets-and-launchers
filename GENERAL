@@ -12,7 +12,13 @@ Cd = 0.5;
 Cl = 0.5;
 d = 3.5;
 A = pi*(d/2)^2;
-pitch =  80;  % dada inventada
+t_turn = 100;
+t_motoroff= 300;
+pitch_final = 30;
+m_pitch = (pitch_final - 90) / (t_motoroff - t_turn);
+
+Q_max = 600000;
+
 
 %% 2. PARÀMETRES DEL VEHICLE I PROPULSIÓ
 dryMass = 22000;
@@ -24,7 +30,7 @@ emptyMass = dryMass + payload;
 
 
 T0 = 650000;      
-Isp0 = 285;       
+Isp0 = 500;       
 mdot = T0 / (Isp0 * g0);
 
 %% 4. CONFIGURACIÓ DE LA SIMULACIÓ I CONDICIONS INICIALS
@@ -40,6 +46,12 @@ h_actual = zeros(N, 1);
 v(1, :) = [0, 0];  
 r(1, :) = [0, rE];
 
+peaches = zeros(N,1);
+peaches(1,:)=90;
+
+fpath_angles = zeros(N,1);
+Q = zeros(N,1);
+
 %% 5. BUCLE D'INTEGRACIÓ NUMÈRICA (FORWARD EULER)
 %VECTOR PERPENDICULAR A r ÉS LOCAL HORIOZN!!!!!!!!!
 %per trobar la direccio ferlo unitari i mutliplicar per magnitud
@@ -48,7 +60,20 @@ r(1, :) = [0, rE];
 %drag en direccio de la velocitat
 
 
-for i = 2:(N-1)
+for i = 2:(N)
+
+    t=dt*i;
+
+    if t < t_turn
+        pitch = 90;
+        peaches(i,:)=pitch;
+    elseif t < t_motoroff
+        pitch = m_pitch*t - m_pitch*t_turn + 90;
+        peaches(i,:)=pitch;
+    elseif t >= t_motoroff
+        pitch = pitch_final;
+        peaches(i,:)=pitch;
+    end
 
     h = norm(r(i-1, :)) - rE;
     g = mu / (norm(r(i-1, :)))^2;
@@ -60,7 +85,7 @@ for i = 2:(N-1)
     local_horizon = [-u_r(2), u_r(1)]; 
     pitch_direction = cosd(pitch)*local_horizon + sind(pitch)*u_r; %canvi de coordenades centrades en coet
     T = T0*pitch_direction;
-    
+
     if v_modul > 0
         u_v = v(i-1, :) / v_modul;
         u_v_perp = [-u_v(2),u_v(1)];
@@ -70,8 +95,18 @@ for i = 2:(N-1)
 
     end
  
+    sin_fpath = dot(u_v, u_r);
+    fpath_angles(i, :) = asind(sin_fpath);
+
+    Q(i,:) = 0.5 * v_modul^2 * rho;
+
+    if Q(i, :) > Q_max
+        i_final = i;
+        break   
+    end
+ 
     if m(i-1)<= emptyMass
-        T = 0;
+        T = [0, 0];
         m(i) = m(i-1);
     else
         m(i) = m(i-1) - mdot*dt;
@@ -91,27 +126,74 @@ for i = 2:(N-1)
     
     if h_actual(i) <= 0 && i>2
         v(i, :) = [0, 0];
+        i_final = i;
         break
-    end     
+    end
  
 end
 
+
 %% 6. POST-PROCESSAT I REPRESENTACIÓ GRÀFICA
 
+idx = 1:i_final;
+
+time = time(idx);
+h_actual = h_actual(idx);
+r = r(idx, :);
+v = v(idx, :);
+peaches = peaches(idx);
+fpath_angles = fpath_angles(idx);
+Q = Q(idx);
+
+theta=atan2(r(:,1),r(:,2));
+x=rE*theta;
+
 figure;
-subplot(1,2,1)
+subplot(3,2,1)
 plot(time, h_actual, 'LineWidth',1.5)
 xlabel('Temps [s]')
 ylabel('Alçada [m]')
 title('Alçada vs Temps')
 grid on
 
+subplot(3,2,2)
+plot(x, h_actual, 'LineWidth',1.5)
+xlabel('Distancia recorregua')
+ylabel('Alçada [m]')
+title('Alçada vs Temps')
+grid on
+
 v_modul = vecnorm(v, 2, 2);
 
-subplot(1, 2, 2)
+subplot(3, 2, 3)
 plot(time, v_modul, 'r', 'LineWidth', 1.5)
 xlabel('Temps [s]')
 ylabel('Velocitat [m/s]')
 title('Velocitat vs Temps')
 grid on
+
+subplot(3, 2, 4)
+plot(time, peaches, 'g', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Pitch Angle (ºdeg)')
+title('Pitch vs Temps')
+grid on
+
+subplot(3, 2, 5)
+plot(time, fpath_angles , 'm', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Flight Path Angle (ºdeg)')
+title('Flight Path vs Temps')
+grid on
+
+subplot(3, 2, 6)
+plot(time, Q , 'r', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Dynamic Pressure (Pa)')
+title('Dynamic Pressure vs Temps')
+grid on
+
+
+
+
 
