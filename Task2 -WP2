@@ -1,164 +1,281 @@
 function task2_gui
+clc; close all;
 
-clc;
-close all;
 
 % CONSTANTS
-RE = 6374.2e3;      % Earth radius [m]
-mu = 3.986e14;      % Earth gravitational parameter [m^3/s^2]
-
+RE = 6374.2e3;
+mu = 3.986e14;
+% SAVED CASES
 savedCases = struct([]);
 caseNumber = 0;
-current = struct();
 
+% CREATE WINDOW
 
-% WINDOW
-fig = uifigure('Name','Task 2 - Insertion claim',...
-               'Position',[100 50 1200 800]);
+fig = uifigure;
+fig.Name = 'Task 2 - Insertion claim';
+fig.Position = [100 50 1200 800];
 
-ax = uiaxes(fig,'Position',[360 220 810 550]);
-xlabel(ax,'x [km]')
-ylabel(ax,'y [km]')
-title(ax,'Coast trajectories - no thrust and no atmosphere')
-grid(ax,'on')
-axis(ax,'equal')
+% CREATE PLOT
+ax = uiaxes(fig);
+ax.Position = [360 220 810 550];
+xlabel(ax,'x [km]');
+ylabel(ax,'y [km]');
+title(ax,'Coast trajectory');
+grid(ax,'on');
+axis(ax,'equal');
+% TARGET ALTITUDE
+labelH = uilabel(fig);
+labelH.Position = [20 745 300 22];
+labelH.Text = 'Target altitude = 300 km';
+sliderH = uislider(fig);
+sliderH.Position = [20 725 300 3];
+sliderH.Limits = [150 1000];
+sliderH.Value = 300;
 
+% GAMMA
+labelGamma = uilabel(fig);
+labelGamma.Position = [20 655 300 22];
+labelGamma.Text = 'Gamma = 0 deg';
+sliderGamma = uislider(fig);
+sliderGamma.Position = [20 635 300 3];
+sliderGamma.Limits = [-90 90];
+sliderGamma.Value = 0;
 
-% SLIDERS
+% COAST TIME
+labelTime = uilabel(fig);
+labelTime.Position = [20 565 300 22];
+labelTime.Text = 'Coast time = 100 min';
+sliderTime = uislider(fig);
+sliderTime.Position = [20 545 300 3];
+sliderTime.Limits = [20 180];
+sliderTime.Value = 100;
 
-labelH = uilabel(fig,'Position',[20 745 300 22]);
-sliderH = uislider(fig,'Position',[20 725 300 3],...
-    'Limits',[150 1000],'Value',572);
+% TIME STEP
+labelDt = uilabel(fig);
+labelDt.Position = [20 475 300 22];
+labelDt.Text = 'dt = 1 s';
+sliderDt = uislider(fig);
+sliderDt.Position = [20 455 300 3];
+sliderDt.Limits = [0.5 10];
+sliderDt.Value = 1;
 
-labelGamma = uilabel(fig,'Position',[20 655 300 22]);
-sliderGamma = uislider(fig,'Position',[20 635 300 3],...
-    'Limits',[-90 90],'Value',0);
-
-labelTime = uilabel(fig,'Position',[20 565 300 22]);
-sliderTime = uislider(fig,'Position',[20 545 300 3],...
-    'Limits',[20 180],'Value',100);
-
-labelDt = uilabel(fig,'Position',[20 475 300 22]);
-sliderDt = uislider(fig,'Position',[20 455 300 3],...
-    'Limits',[0.5 10],'Value',1);
-
-
-% RESULTS LABELS
-
-labelVc = uilabel(fig,'Position',[20 400 320 22]);
-labelVr = uilabel(fig,'Position',[20 375 320 22]);
-labelVt = uilabel(fig,'Position',[20 350 320 22]);
-labelE = uilabel(fig,'Position',[20 325 320 22]);
-labelPerigee = uilabel(fig,'Position',[20 300 320 22]);
-labelApogee = uilabel(fig,'Position',[20 275 320 22]);
-
-labelOrbit = uilabel(fig,'Position',[20 250 320 22]);
+% CURRENT RESULTS
+labelVc = uilabel(fig);
+labelVc.Position = [20 400 320 22];
+labelVr = uilabel(fig);
+labelVr.Position = [20 375 320 22];
+labelVt = uilabel(fig);
+labelVt.Position = [20 350 320 22];
+labelE = uilabel(fig);
+labelE.Position = [20 325 320 22];
+labelPerigee = uilabel(fig);
+labelPerigee.Position = [20 300 320 22];
+labelApogee = uilabel(fig);
+labelApogee.Position = [20 275 320 22];
+labelOrbit = uilabel(fig);
+labelOrbit.Position = [20 250 320 22];
 labelOrbit.FontWeight = 'bold';
 
-
 % BUTTONS
+saveButton = uibutton(fig,'push');
+saveButton.Position = [20 200 140 35];
+saveButton.Text = 'SAVE CASE';
+saveButton.ButtonPushedFcn = @(src,event) saveCase();
+clearButton = uibutton(fig,'push');
+clearButton.Position = [180 200 140 35];
+clearButton.Text = 'CLEAR CASES';
+clearButton.ButtonPushedFcn = @(src,event) clearCases();
 
-saveButton = uibutton(fig,'push',...
-    'Position',[20 200 140 35],...
-    'Text','SAVE CASE',...
-    'ButtonPushedFcn',@saveCase);
+% RESULTS TABLE
+tableResults = uitable(fig);
+tableResults.Position = [20 20 1150 155];
+tableResults.ColumnName = {'Case','Gamma [deg]','Vc [km/s]',...
+    'Vr [km/s]','Vt [km/s]','e','Perigee [km]',...
+    'Apogee [km]','Orbit type','Energy error [%]','h error [%]'};
 
-clearButton = uibutton(fig,'push',...
-    'Position',[180 200 140 35],...
-    'Text','CLEAR CASES',...
-    'ButtonPushedFcn',@clearCases);
-
-
-% TABLE
-
-tableResults = uitable(fig,...
-    'Position',[20 20 1150 155]);
-
-tableResults.ColumnName = {...
-    'Case','Gamma [deg]','Vc [km/s]',...
-    'Vr [km/s]','Vt [km/s]','e',...
-    'Perigee [km]','Apogee [km]',...
-    'Orbit type','Energy error [%]','h error [%]'};
-
-
-% SLIDER CALLBACKS
-
-sliderH.ValueChangedFcn = @updateCurrent;
-sliderGamma.ValueChangedFcn = @updateCurrent;
-sliderTime.ValueChangedFcn = @updateCurrent;
-sliderDt.ValueChangedFcn = @updateCurrent;
-
+% CALLBACKS
+sliderH.ValueChangedFcn = @(src,event) updateCurrent();
+sliderGamma.ValueChangedFcn = @(src,event) updateCurrent();
+sliderTime.ValueChangedFcn = @(src,event) updateCurrent();
+sliderDt.ValueChangedFcn = @(src,event) updateCurrent();
+% FIRST CALCULATION
 updateCurrent();
 
-
-
-% ---------------------------------------------------------
 % UPDATE CURRENT CASE
-% ---------------------------------------------------------
-
-function updateCurrent(~,~)
-
+function updateCurrent()
+    % Read sliders
     hTarget = sliderH.Value*1000;
     gamma = sliderGamma.Value;
     coastTime = sliderTime.Value*60;
     dt = sliderDt.Value;
-
+    
+    % Update labels
     labelH.Text = sprintf('Target altitude = %.0f km',sliderH.Value);
     labelGamma.Text = sprintf('Gamma = %.1f deg',gamma);
     labelTime.Text = sprintf('Coast time = %.0f min',sliderTime.Value);
     labelDt.Text = sprintf('dt = %.1f s',dt);
-
-    current = calculateCase(hTarget,gamma,coastTime,dt);
-
-    labelVc.Text = sprintf('Circular speed = %.3f km/s',current.Vc/1000);
-    labelVr.Text = sprintf('Radial velocity = %.3f km/s',current.Vr/1000);
-    labelVt.Text = sprintf('Tangential velocity = %.3f km/s',current.Vt/1000);
-    labelE.Text = sprintf('Eccentricity = %.4f',current.e);
-    labelPerigee.Text = sprintf('Perigee altitude = %.1f km',current.hp);
-    labelApogee.Text = sprintf('Apogee altitude = %.1f km',current.ha);
-    labelOrbit.Text = ['Orbit type: ' current.orbitType];
-
-    drawPlot();
-
-end
-
-
-
-% ---------------------------------------------------------
-% CALCULATE ONE CASE
-% ---------------------------------------------------------
-
-function data = calculateCase(hTarget,gamma,coastTime,dt)
-
+    
+    % Initial orbital values
     r0 = RE + hTarget;
-
-    % Circular speed
     Vc = sqrt(mu/r0);
-
-    % Velocity components
     Vr = Vc*sind(gamma);
     Vt = Vc*cosd(gamma);
-
-    % Orbital energy
     energy0 = Vc^2/2 - mu/r0;
-
-    % Angular momentum
-    hOrb = r0*Vt;
-
-    % Semi-major axis
+    hOrb0 = r0*Vt;
+    
+    % Orbit geometry
     a = -mu/(2*energy0);
-
-    % Eccentricity
-    e = sqrt(1 + 2*energy0*hOrb^2/mu^2);
-
-    % Perigee and apogee
+    e = sqrt(1 + (2*energy0*hOrb0^2)/(mu^2));
     rp = a*(1-e);
     ra = a*(1+e);
-
     hp = (rp-RE)/1000;
     ha = (ra-RE)/1000;
-
+    
     % Orbit type
+    orbitType = getOrbitType(rp,e);
+    
+    % Show values
+    labelVc.Text = sprintf('Circular speed = %.3f km/s',Vc/1000);
+    labelVr.Text = sprintf('Radial velocity = %.3f km/s',Vr/1000);
+    labelVt.Text = sprintf('Tangential velocity = %.3f km/s',Vt/1000);
+    labelE.Text = sprintf('Eccentricity = %.4f',e);
+    labelPerigee.Text = sprintf('Perigee altitude = %.1f km',hp);
+    labelApogee.Text = sprintf('Apogee altitude = %.1f km',ha);
+    labelOrbit.Text = sprintf('Orbit type: %s',orbitType);
+    
+    % Propagate trajectory
+    [x,y,~,~,energy,hMomentum] = ...
+        propagateCoast(r0,Vr,Vt,dt,coastTime);
+    
+    % Numerical errors
+    energyError = max(abs((energy-energy(1))/energy(1)))*100;
+    hError = max(abs((hMomentum-hMomentum(1))/hMomentum(1)))*100;
+    
+    % Current case structure
+    current.gamma = gamma;
+    current.Vc = Vc;
+    current.Vr = Vr;
+    current.Vt = Vt;
+    current.e = e;
+    current.hp = hp;
+    current.ha = ha;
+    current.orbitType = orbitType;
+    current.energyError = energyError;
+    current.hError = hError;
+    current.x = x;
+    current.y = y;
+    
+    % Draw
+    drawPlot(current);
+end
+
+% SAVE CASE
+function saveCase()
+    
+    % Read current values
+    hTarget = sliderH.Value*1000;
+    gamma = sliderGamma.Value;
+    coastTime = sliderTime.Value*60;
+    dt = sliderDt.Value;
+    
+    % Orbital quantities
+    r0 = RE + hTarget;
+    Vc = sqrt(mu/r0);
+    Vr = Vc*sind(gamma);
+    Vt = Vc*cosd(gamma);
+    energy0 = Vc^2/2 - mu/r0;
+    hOrb0 = r0*Vt;
+    a = -mu/(2*energy0);
+    e = sqrt(1 + (2*energy0*hOrb0^2)/(mu^2));
+    rp = a*(1-e);
+    ra = a*(1+e);
+    hp = (rp-RE)/1000;
+    ha = (ra-RE)/1000;
+    orbitType = getOrbitType(rp,e);
+    
+    % Propagate
+    [x,y,~,~,energy,hMomentum] = ...
+        propagateCoast(r0,Vr,Vt,dt,coastTime);
+    % Errors
+    energyError = max(abs((energy-energy(1))/energy(1)))*100;
+    hError = max(abs((hMomentum-hMomentum(1))/hMomentum(1)))*100;
+    
+    % Save structure
+    caseNumber = caseNumber + 1;
+    savedCases(caseNumber).gamma = gamma;
+    savedCases(caseNumber).Vc = Vc;
+    savedCases(caseNumber).Vr = Vr;
+    savedCases(caseNumber).Vt = Vt;
+    savedCases(caseNumber).e = e;
+    savedCases(caseNumber).hp = hp;
+    savedCases(caseNumber).ha = ha;
+    savedCases(caseNumber).orbitType = orbitType;
+    savedCases(caseNumber).energyError = energyError;
+    savedCases(caseNumber).hError = hError;
+    savedCases(caseNumber).x = x;
+    savedCases(caseNumber).y = y;
+    updateTable();
+    updateCurrent();
+end
+
+% CLEAR CASES
+function clearCases()
+    savedCases = struct([]);
+    caseNumber = 0;
+    tableResults.Data = {};
+    updateCurrent();
+end
+
+% UPDATE TABLE
+function updateTable()
+    data = cell(caseNumber,11);
+    for j = 1:caseNumber
+        data{j,1} = j;
+        data{j,2} = savedCases(j).gamma;
+        data{j,3} = savedCases(j).Vc/1000;
+        data{j,4} = savedCases(j).Vr/1000;
+        data{j,5} = savedCases(j).Vt/1000;
+        data{j,6} = savedCases(j).e;
+        data{j,7} = savedCases(j).hp;
+        data{j,8} = savedCases(j).ha;
+        data{j,9} = savedCases(j).orbitType;
+        data{j,10} = savedCases(j).energyError;
+        data{j,11} = savedCases(j).hError;
+    end
+    tableResults.Data = data;
+end
+
+% DRAW PLOT
+function drawPlot(current)
+    cla(ax);
+    hold(ax,'on');
+    axis(ax,'equal');
+    grid(ax,'on');
+    % Earth
+    angleEarth = linspace(0,2*pi,400);
+    xEarth = RE*cos(angleEarth)/1000;
+    yEarth = RE*sin(angleEarth)/1000;
+    plot(ax,xEarth,yEarth,'LineWidth',1.5,'DisplayName','Earth');
+    
+    % Saved cases
+    for j = 1:caseNumber
+        plot(ax,savedCases(j).x/1000,savedCases(j).y/1000,...
+            'LineWidth',1.5,'DisplayName',...
+            sprintf('Saved %d: gamma = %.1f deg',j,savedCases(j).gamma));
+    end
+    
+    % Current case
+    plot(ax,current.x/1000,current.y/1000,'--',...
+        'LineWidth',1.5,'DisplayName',...
+        sprintf('Current: gamma = %.1f deg',current.gamma));
+    xlabel(ax,'x [km]');
+    ylabel(ax,'y [km]');
+    title(ax,'Coast trajectories - no thrust and no atmosphere');
+    legend(ax,'Location','best');
+end
+
+% ORBIT TYPE
+function orbitType = getOrbitType(rp,e)
     if rp < RE
         orbitType = 'Surface-intersecting';
     elseif e < 0.001
@@ -166,206 +283,50 @@ function data = calculateCase(hTarget,gamma,coastTime,dt)
     else
         orbitType = 'Elliptical';
     end
-
-    % Coast propagation
-    [x,y,energy,hMomentum] = propagateCoast(r0,Vr,Vt,dt,coastTime);
-
-    % Numerical errors
-    energyError = max(abs((energy-energy(1))/energy(1)))*100;
-    hError = max(abs((hMomentum-hMomentum(1))/hMomentum(1)))*100;
-
-    % Save all results
-    data.gamma = gamma;
-    data.Vc = Vc;
-    data.Vr = Vr;
-    data.Vt = Vt;
-    data.e = e;
-    data.hp = hp;
-    data.ha = ha;
-    data.orbitType = orbitType;
-    data.energyError = energyError;
-    data.hError = hError;
-    data.x = x;
-    data.y = y;
-
 end
 
-
-
-% ---------------------------------------------------------
-% SAVE CASE
-% ---------------------------------------------------------
-
-function saveCase(~,~)
-
-    caseNumber = caseNumber + 1;
-
-    savedCases(caseNumber) = current;
-
-    updateTable();
-    drawPlot();
-
-end
-
-
-
-% ---------------------------------------------------------
-% CLEAR CASES
-% ---------------------------------------------------------
-
-function clearCases(~,~)
-
-    savedCases = struct([]);
-    caseNumber = 0;
-
-    tableResults.Data = {};
-
-    drawPlot();
-
-end
-
-
-
-% ---------------------------------------------------------
-% UPDATE TABLE
-% ---------------------------------------------------------
-
-function updateTable()
-
-    data = cell(caseNumber,11);
-
-    for j = 1:caseNumber
-
-        data(j,:) = {...
-            j,...
-            savedCases(j).gamma,...
-            savedCases(j).Vc/1000,...
-            savedCases(j).Vr/1000,...
-            savedCases(j).Vt/1000,...
-            savedCases(j).e,...
-            savedCases(j).hp,...
-            savedCases(j).ha,...
-            savedCases(j).orbitType,...
-            savedCases(j).energyError,...
-            savedCases(j).hError};
-
-    end
-
-    tableResults.Data = data;
-
-end
-
-
-
-% ---------------------------------------------------------
-% DRAW TRAJECTORIES
-% ---------------------------------------------------------
-
-function drawPlot()
-
-    cla(ax)
-    hold(ax,'on')
-    grid(ax,'on')
-    axis(ax,'equal')
-
-    % Earth
-    ang = linspace(0,2*pi,400);
-
-    plot(ax,...
-        RE*cos(ang)/1000,...
-        RE*sin(ang)/1000,...
-        'LineWidth',1.5,...
-        'DisplayName','Earth');
-
-    % Saved cases
-    for j = 1:caseNumber
-
-        plot(ax,...
-            savedCases(j).x/1000,...
-            savedCases(j).y/1000,...
-            'LineWidth',1.5,...
-            'DisplayName',...
-            sprintf('Saved %d: gamma = %.1f deg',...
-            j,savedCases(j).gamma));
-
-    end
-
-    % Current case
-    plot(ax,...
-        current.x/1000,...
-        current.y/1000,...
-        '--',...
-        'LineWidth',1.5,...
-        'DisplayName',...
-        sprintf('Current: gamma = %.1f deg',current.gamma));
-
-    xlabel(ax,'x [km]')
-    ylabel(ax,'y [km]')
-    title(ax,'Coast trajectories - no thrust and no atmosphere')
-    legend(ax,'Location','best')
-
-end
-
-
-
-% ---------------------------------------------------------
-% FORWARD EULER COAST
-% ---------------------------------------------------------
-
-function [x,y,energy,hMomentum] = propagateCoast(r0,Vr,Vt,dt,tEnd)
-
-    N = floor(tEnd/dt)+1;
-
+% PROPAGATE COAST - FORWARD EULER
+function [x,y,vx,vy,energy,hMomentum] = ...
+        propagateCoast(r0,Vr,Vt,dt,tEnd)
+    % Number of steps and arrays
+    N = floor(tEnd/dt) + 1;
     x = zeros(1,N);
     y = zeros(1,N);
     vx = zeros(1,N);
     vy = zeros(1,N);
-
-    % Initial state
+    % Initial conditions
     x(1) = r0;
     y(1) = 0;
-
     vx(1) = Vr;
     vy(1) = Vt;
-
     lastPoint = N;
-
+    
+    % Forward Euler integration
     for i = 1:N-1
-
         r = sqrt(x(i)^2 + y(i)^2);
-
-        % Gravity
-        axG = -mu*x(i)/r^3;
-        ayG = -mu*y(i)/r^3;
-
-        % Forward Euler
+        axGravity = -mu*x(i)/r^3;
+        ayGravity = -mu*y(i)/r^3;
         x(i+1) = x(i) + vx(i)*dt;
         y(i+1) = y(i) + vy(i)*dt;
-
-        vx(i+1) = vx(i) + axG*dt;
-        vy(i+1) = vy(i) + ayG*dt;
-
-        % Impact
-        if sqrt(x(i+1)^2 + y(i+1)^2) <= RE
+        vx(i+1) = vx(i) + axGravity*dt;
+        vy(i+1) = vy(i) + ayGravity*dt;
+        rNew = sqrt(x(i+1)^2 + y(i+1)^2);
+        if rNew <= RE
             lastPoint = i+1;
             break
         end
-
     end
-
+    
     % Remove unused values
     x = x(1:lastPoint);
     y = y(1:lastPoint);
     vx = vx(1:lastPoint);
     vy = vy(1:lastPoint);
-
-    % Energy and angular momentum
+    
+    % Conserved quantities
     r = sqrt(x.^2 + y.^2);
-
-    energy = 0.5*(vx.^2 + vy.^2) - mu./r;
-
+    V2 = vx.^2 + vy.^2;
+    energy = 0.5*V2 - mu./r;
     hMomentum = x.*vy - y.*vx;
-
 end
-
 end
