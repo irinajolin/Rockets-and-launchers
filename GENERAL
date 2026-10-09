@@ -1,4 +1,4 @@
-%% WP1: CORE DYNAMICS 
+%% WP1: CORE DYNAMICS - PLANTILLA DE CODI
 clear; clc; close all;
 
 %% 1. CONSTANTS FÍSIQUES I GEOMETRIA
@@ -12,12 +12,12 @@ Cd = 0.5;
 Cl = 0.5;
 d = 3.5;
 A = pi*(d/2)^2;
-t_turn = 100;
-t_motoroff= 300;
-pitch_final = 30;
+t_turn = 0;
+t_motoroff= 500;
+pitch_final = 0;
 m_pitch = (pitch_final - 90) / (t_motoroff - t_turn);
 
-Q_max = 600000;
+Q_max = 6000000;
 
 
 %% 2. PARÀMETRES DEL VEHICLE I PROPULSIÓ
@@ -30,12 +30,12 @@ emptyMass = dryMass + payload;
 
 
 T0 = 650000;      
-Isp0 = 500;       
+Isp0 = 2250;       
 mdot = T0 / (Isp0 * g0);
 
 %% 4. CONFIGURACIÓ DE LA SIMULACIÓ I CONDICIONS INICIALS
 dt = 0.1;
-tf = 400;
+tf = 24*3600;
 time = 0:dt:tf;
 N = length(time);
 
@@ -129,7 +129,7 @@ for i = 2:(N)
         i_final = i;
         break
     end
- 
+    i_final=i;
 end
 
 
@@ -194,6 +194,15 @@ title('Dynamic Pressure vs Temps')
 grid on
 
 
-
-
-
+theta_earth = linspace(0, 2*pi, 300);
+x_earth = (rE / 1000) * cos(theta_earth); % [km]
+y_earth = (rE / 1000) * sin(theta_earth); % [km]
+figure;
+plot(x_earth,y_earth,'k','LineWidth', 1.5)
+hold on
+plot(r(:,1)/1000, r(:,2)/1000, 'LineWidth',1.5) % Dividit per 1000 per tenir km
+xlabel('Posició X [km]')
+ylabel('Posició Y [km]')
+title('Trajectòria 2D respecte al Centre de la Terra')
+axis equal % Perquè la Terra no es vegi el·líptica
+grid on
