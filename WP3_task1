@@ -1,0 +1,251 @@
+%% WP1: CORE DYNAMICS 
+clear; clc; close all;
+
+%% 1. CONSTANTS FÍSIQUES I GEOMETRIA
+
+g0 = 9.80665;
+mu = 3.986e14;
+rE = 6371e3;
+rho0 = 1.225;
+H = 9500;
+Cd = 0.5;
+Cl = 0.5;
+d = 3.5;
+A = pi*(d/2)^2;
+t_turn = 0;
+t_motoroff= 500;
+pitch_final = 0;
+m_pitch = (pitch_final - 90) / (t_motoroff - t_turn);
+
+Q_max = 6000000;
+
+
+%% 2. PARÀMETRES DEL VEHICLE I PROPULSIÓ
+dryMass = 22000;
+propMass = 18000;
+payload = 6000;
+m0 = dryMass + propMass + payload;
+m(1,:) = m0;
+emptyMass = dryMass + payload;
+
+mprop1 = 10000;
+mprop2 = 8000;
+mdry1 = 12000;
+mdry2 = 10000;
+
+T0 = 650000;      
+Isp0 = 2250;       
+mdot = T0 / (Isp0 * g0);
+
+
+tburn1 = mprop1/mdot;
+tburn2 = mprop2/mdot;
+
+stages = true;
+stage1 = false;
+stage2 = false;
+%% 4. CONFIGURACIÓ DE LA SIMULACIÓ I CONDICIONS INICIALS
+dt = 0.1;
+tf = 1000;
+time = 0:dt:tf;
+N = length(time);
+
+r = zeros(N, 2);
+v = zeros(N, 2);
+h_actual = zeros(N, 1);
+
+v(1, :) = [0, 0];  
+r(1, :) = [0, rE];
+
+peaches = zeros(N,1);
+peaches(1,:)=90;
+
+fpath_angles = zeros(N,1);
+Q = zeros(N,1);
+
+%% 5. BUCLE D'INTEGRACIÓ NUMÈRICA (FORWARD EULER)
+%VECTOR PERPENDICULAR A r ÉS LOCAL HORIOZN!!!!!!!!!
+%per trobar la direccio ferlo unitari i mutliplicar per magnitud
+%multipliquem per vector unitari per fer canvi de coordenades i qu ethrust
+%surti del coet 
+%drag en direccio de la velocitat
+
+
+for i = 2:(N)
+
+    t=dt*(i-1);
+
+    if t < t_turn
+        pitch = 90;
+        peaches(i,:)=pitch;
+    elseif t < t_motoroff
+        pitch = m_pitch*t - m_pitch*t_turn + 90;
+        peaches(i,:)=pitch;
+    elseif t >= t_motoroff
+        pitch = pitch_final;
+        peaches(i,:)=pitch;
+    end
+
+    h = norm(r(i-1, :)) - rE;
+    g = mu / (norm(r(i-1, :)))^2;
+    rho = rho0 * exp(-h/H);
+   
+    v_modul = norm(v(i-1, :));
+
+    u_r = r(i-1, :) / norm(r(i-1, :));
+    local_horizon = [-u_r(2), u_r(1)]; 
+    pitch_direction = cosd(pitch)*local_horizon + sind(pitch)*u_r; %canvi de coordenades centrades en coet
+    T = T0*pitch_direction;
+
+    if v_modul > 0
+        u_v = v(i-1, :) / v_modul;
+        u_v_perp = [-u_v(2),u_v(1)];
+    else
+        u_v = [0, 0];
+        u_v_perp = [0,0];
+
+    end
+ 
+    sin_fpath = dot(u_v, u_r);
+    fpath_angles(i, :) = asind(sin_fpath);
+
+    Q(i,:) = 0.5 * v_modul^2 * rho;
+
+    if Q(i, :) > Q_max
+        i_final = i;
+        break   
+    end
+
+    
+ 
+    if m(i-1,:)<= emptyMass
+        T = [0, 0];
+        m(i,:) = m(i-1,:);
+        tburn = dt*i;
+        elseif t < tburn1
+                m(i,:) = m(i-1,:) - mdot*dt;
+            
+        elseif (t >= tburn1) && (t < (tburn1 + tburn2)) 
+                if stage1 == false                                 
+                    m(i,:) = m(i-1,:) - mdot*dt - mdry1;
+                    emptyMass = emptyMass - mdry1;                    
+                    stage1 = true;                    
+                else 
+                    m(i,:) = m(i-1,:) - mdot*dt;
+                end
+        
+        elseif t >= (tburn1 + tburn2) 
+                if stage2 == false              
+                    m(i,:) = m(i-1,:) - mdot*dt -mdry2;                
+                    emptyMass = emptyMass - mdry2;
+                    stage2 = true;          
+                else 
+                    m(i,:) = m(i-1,:) - mdot*dt;
+                end
+    
+    end
+
+    W = - m(i, :)* g *u_r; %weight en direcció avall
+    D = -0.5 * rho * v_modul^2 * Cd * A * u_v; %drag en sentit contrari a velocitat
+    L = -0.5 * rho * v_modul^2 * Cl * A * u_v_perp; %lift perpendicular a velocitat
+
+    F_total = T + W + D + L;
+    
+    a = F_total / m(i,:);
+
+    v(i, :) = v(i-1, :) + a*dt; 
+    r(i, :) = r(i-1, :) + v(i, :)*dt;
+    h_actual(i) = norm(r(i, :)) - rE;
+    
+    if h_actual(i) <= 0 && i>2
+        v(i, :) = [0, 0];
+        i_final = i;
+        break
+    end
+    i_final=i;
+end
+
+
+%% 6. POST-PROCESSAT I REPRESENTACIÓ GRÀFICA
+
+disp(tburn)
+
+idx = 1:i_final;
+
+time = time(idx);
+h_actual = h_actual(idx);
+r = r(idx, :);
+v = v(idx, :);
+peaches = peaches(idx);
+fpath_angles = fpath_angles(idx);
+Q = Q(idx);
+
+theta=atan2(r(:,1),r(:,2));
+x=rE*theta;
+
+figure;
+subplot(3,3,1)
+plot(time, h_actual, 'LineWidth',1.5)
+xlabel('Temps [s]')
+ylabel('Alçada [m]')
+title('Alçada vs Temps')
+grid on
+
+subplot(3,3,2)
+plot(x, h_actual, 'LineWidth',1.5)
+xlabel('Distancia recorregua')
+ylabel('Alçada [m]')
+title('Alçada vs Temps')
+grid on
+
+v_modul = vecnorm(v, 2, 2);
+
+subplot(3, 3, 3)
+plot(time, v_modul, 'r', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Velocitat [m/s]')
+title('Velocitat vs Temps')
+grid on
+
+subplot(3, 3, 4)
+plot(time, peaches, 'g', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Pitch Angle (ºdeg)')
+title('Pitch vs Temps')
+grid on
+
+subplot(3, 3, 5)
+plot(time, fpath_angles , 'm', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Flight Path Angle (ºdeg)')
+title('Flight Path vs Temps')
+grid on
+
+subplot(3, 3, 6)
+plot(time, Q , 'r', 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Dynamic Pressure (Pa)')
+title('Dynamic Pressure vs Temps')
+grid on
+
+subplot(3, 3, 7)
+plot(time, m, 'LineWidth', 1.5)
+xlabel('Temps [s]')
+ylabel('Total Mass [kg]')
+title('Massa vs Temps')
+
+
+theta_earth = linspace(0, 2*pi, 300);
+x_earth = (rE / 1000) * cos(theta_earth); % [km]
+y_earth = (rE / 1000) * sin(theta_earth); % [km]
+figure;
+plot(x_earth,y_earth,'k','LineWidth', 1.5)
+hold on
+plot(r(:,1)/1000, r(:,2)/1000, 'LineWidth',1.5) % Dividit per 1000 per tenir km
+xlabel('Posició X [km]')
+ylabel('Posició Y [km]')
+title('Trajectòria 2D respecte al Centre de la Terra')
+axis equal % Perquè la Terra no es vegi el·líptica
+grid on
+
+
