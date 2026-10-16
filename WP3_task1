@@ -1,3 +1,4 @@
+
 %% WP1: CORE DYNAMICS 
 clear; clc; close all;
 
@@ -26,12 +27,14 @@ propMass = 18000;
 payload = 6000;
 m0 = dryMass + propMass + payload;
 m(1,:) = m0;
+m2(1, :) = m0;
 emptyMass = dryMass + payload;
 
 mprop1 = 10000;
 mprop2 = 8000;
 mdry1 = 12000;
 mdry2 = 10000;
+
 
 T0 = 650000;      
 Isp0 = 2250;       
@@ -54,7 +57,8 @@ r = zeros(N, 2);
 v = zeros(N, 2);
 h_actual = zeros(N, 1);
 
-v(1, :) = [0, 0];  
+v(1, :) = [0, 0]; 
+v2(1, :) = [0, 0];
 r(1, :) = [0, rE];
 
 peaches = zeros(N,1);
@@ -69,6 +73,7 @@ Q = zeros(N,1);
 %multipliquem per vector unitari per fer canvi de coordenades i qu ethrust
 %surti del coet 
 %drag en direccio de la velocitat
+
 
 
 for i = 2:(N)
@@ -116,33 +121,34 @@ for i = 2:(N)
         break   
     end
 
-    
- 
-    if m(i-1,:)<= emptyMass
+  
+    if m(i-1,:) <= emptyMass
         T = [0, 0];
-        m(i,:) = m(i-1,:);
-        tburn = dt*i;
-        elseif t < tburn1
-                m(i,:) = m(i-1,:) - mdot*dt;
-            
-        elseif (t >= tburn1) && (t < (tburn1 + tburn2)) 
-                if stage1 == false                                 
-                    m(i,:) = m(i-1,:) - mdot*dt - mdry1;
-                    emptyMass = emptyMass - mdry1;                    
-                    stage1 = true;                    
-                else 
-                    m(i,:) = m(i-1,:) - mdot*dt;
-                end
-        
-        elseif t >= (tburn1 + tburn2) 
-                if stage2 == false              
-                    m(i,:) = m(i-1,:) - mdot*dt -mdry2;                
-                    emptyMass = emptyMass - mdry2;
-                    stage2 = true;          
-                else 
-                    m(i,:) = m(i-1,:) - mdot*dt;
-                end
+        m(i,:)  = m(i-1,:);
+        m2(i,:) = m2(i-1,:);
+        tburn   = dt * i;
     
+    elseif t < tburn1
+        m(i,:)  = m(i-1,:)  - mdot * dt;
+        m2(i,:) = m2(i-1,:) - mdot * dt;
+    
+    elseif (t >= tburn1) && (t < (tburn1 + tburn2))
+        m(i,:) = m(i-1,:) - mdot * dt;
+        if stage1 == false
+            m2(i,:) = m2(i-1,:) - mdot * dt - mdry1;
+            stage1  = true;
+        else
+            m2(i,:) = m2(i-1,:) - mdot * dt;
+        end
+    
+    elseif t >= (tburn1 + tburn2)
+        m(i,:) = m(i-1,:);  % motor apagat ja que ja hem passat tburn total
+        if stage2 == false
+            m2(i,:) = m2(i-1,:) - mdry2;
+            stage2  = true;
+        else
+            m2(i,:) = m2(i-1,:);
+        end
     end
 
     W = - m(i, :)* g *u_r; %weight en direcció avall
@@ -152,8 +158,10 @@ for i = 2:(N)
     F_total = T + W + D + L;
     
     a = F_total / m(i,:);
+    a2 = F_total / m2(i,:);
 
     v(i, :) = v(i-1, :) + a*dt; 
+    v2(i,:) = v2(i-1, :) + a2*dt;
     r(i, :) = r(i-1, :) + v(i, :)*dt;
     h_actual(i) = norm(r(i, :)) - rE;
     
@@ -168,7 +176,7 @@ end
 
 %% 6. POST-PROCESSAT I REPRESENTACIÓ GRÀFICA
 
-disp(tburn)
+
 
 idx = 1:i_final;
 
@@ -199,6 +207,7 @@ title('Alçada vs Temps')
 grid on
 
 v_modul = vecnorm(v, 2, 2);
+v2_modul = vecnorm(v2, 2, 2);
 
 subplot(3, 3, 3)
 plot(time, v_modul, 'r', 'LineWidth', 1.5)
@@ -206,6 +215,8 @@ xlabel('Temps [s]')
 ylabel('Velocitat [m/s]')
 title('Velocitat vs Temps')
 grid on
+hold on
+plot(time, v2_modul, 'b', 'LineWidth', 1.5)
 
 subplot(3, 3, 4)
 plot(time, peaches, 'g', 'LineWidth', 1.5)
@@ -233,6 +244,9 @@ plot(time, m, 'LineWidth', 1.5)
 xlabel('Temps [s]')
 ylabel('Total Mass [kg]')
 title('Massa vs Temps')
+hold on
+plot(time, m2, 'LineWidth', 1.5)
+
 
 
 theta_earth = linspace(0, 2*pi, 300);
@@ -247,5 +261,7 @@ ylabel('Posició Y [km]')
 title('Trajectòria 2D respecte al Centre de la Terra')
 axis equal % Perquè la Terra no es vegi el·líptica
 grid on
+
+
 
 
