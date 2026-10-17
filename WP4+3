@@ -1,0 +1,512 @@
+function WP4_Task
+clc; close all;
+% 1. CONSTANTS AND VEHICLE
+g0 = 9.80665;
+mu = 3.986004418e14;
+rE = 6371000;
+rho0 = 1.225;
+H = 7200;
+m_payload = 4000;
+% constantes WP4 
+omegaE = 7.2921159e-5;   % Earth rotation [rad/s]
+heading = 60;            % N60E
+
+% Stage 1
+m_dry1 = 20000;
+m_prop1 = 250000;
+T1 = 4e6;
+Isp1 = 310;
+A1 = 10; % area aerodinamica de referencia
+Cd1 = 0.35;
+
+% Stage 2
+m_dry2 = 6000;
+m_prop2 = 65000;
+T2 = 7e5;
+Isp2 = 360;
+A2 = 7;
+Cd2 = 0.30;
+
+mdot1 = T1/(Isp1*g0); % cuantos kg de propellant/s consume stage 1 
+mdot2 = T2/(Isp2*g0);
+
+% Important times
+t1 = m_prop1/mdot1;                   % Stage 1 burnout --> instante en el que el stage 1 se queda sin propellant
+tIgn = t1 + 3;                      % Stage 2 ignition --> because of coast
+tCut = tIgn + 0.946*m_prop2/mdot2;    % Final cutoff
+
+m0 = m_dry1 + m_prop1 + m_dry2 + m_prop2 + m_payload;
+% 2. TARGET AND LIMITS
+
+hTarget = 200e3; % queremos una orbita circular a 200km
+rTarget = rE + hTarget;
+VTarget = sqrt(mu/rTarget); % velocidad circular correspondiente
+
+% radius, Vr, Vt, perigee, apogee
+limits = [5000 25 25 5000 5000]; % las tolerancias de tabla WP
+
+Qlimit = 100e3;
+% 3. GRID
+
+pitchGrid = 7.22:0.025:7.42; % valores de pitch que vamos a probar 
+timeGrid = 208:0.5:212; % valores de tf que probamos
+
+dt = 0.0125; % el paso de la integración
+
+nPitch = length(pitchGrid); % cuenta los pitches =9
+nTime = length(timeGrid); % cuenta los tiempos = 9 
+nCases = nPitch*nTime; % calcula el numero total de vuelos 9x9 
+
+% Columns:
+% pitch time J 5 errors hp ha Qmax accepted failed
+R = zeros(nCases,13); % matriz donde guardamos los resultados (81 x 13)
+
+Jmap = zeros(nPitch,nTime); % crea una matriz de 9x9 para despues hacer el mapa de J 
+acceptedMap = false(nPitch,nTime); % otra matriz 9x9, aqui guardamos true si el vuelo es aceptable o false si no lo es
+% 4. RUN 81 FLIGHTS
+k = 0; % contador de vuelos
+for ip = 1:nPitch % recorremos los 9 pitches
+    for it = 1:nTime % para cada pitch recorremos los 9 tiempos 
+
+        k = k + 1; % augmentamos el numero de caso 
+        pf = pitchGrid(ip); % seleccionamos el pitch que toca en este vuelo pf=final pitch
+        tf = timeGrid(it); % seleccionamos el final pitch time
+
+        out = sim(pf,tf,dt); % simulamos ese vuelo ( simula un vuelo completo usando, ese pf, ese tf y ese dt)
+
+        R(k,:) = [pf tf out.J out.err out.hp out.ha ... % guardamos los resultados, todo el vuelo en una unica fila, out.err contiene cinco numeros Er, Evr,Evt, Ehp, Eha
+                  out.Qmax out.accepted out.failed];
+
+        Jmap(ip,it) = out.J; % guardamos J en la posición correspondiente del mapa 
+        acceptedMap(ip,it) = out.accepted; % guardamos si ese punto ha sido aceptable 
+    end
+end
+% 5. TABLE
+
+Status = repmat("Completed-unacceptable",nCases,1); % status de cada vuelo, inicialmente consideramos todos los vuelos completed-unacceptable, han terminado pero no cumplen todos los requisitos
+Status(logical(R(:,12))) = "Acceptable"; % la columna 12 es accepted, si vale 1 cambiamos su estatus a acceptable 
+Status(logical(R(:,13))) = "Failed"; % la columna 13 indica si el vuelo falló antes del cutoff, por impacto o otros, entonces ponemos failed
+
+Results = array2table(R(:,1:12)); % creamos la tabla , convierte las 12 primeras columnas de R en una tabla, no incluimos failed porque ya lo representamos en status
+
+Results.Properties.VariableNames = { ...
+    'Pitch','Time','J','rError','VrError','VtError', ...
+    'hpError','haError','Perigee','Apogee','Qmax','Accepted'}; % nombres de las columnas 
+
+Results.Status = Status; % añadimos la columna de texti acceptable/completed unacceptable/failed)
+
+disp(Results) % muestra la tabla en pantalla 
+% 6. BEST ACCEPTABLE FLIGHT
+% buscamos solo los casos aceptables 
+valid = find(R(:,12) == 1); % la columna 12 es accepted,asi que buscamos las filas donde accepted= 1 
+
+if isempty(valid) % la lista de vuelos aceptables esta vacia?
+    disp('NO ACCEPTABLE FLIGHT FOUND')
+    return
+end
+% elegimos el mejor 
+[bestJ,pos] = min(R(valid,3));%dame los valores de J unicamente de los vuelos aceptables , el min = busca el menor 
+
+bestCase = valid(pos); % averuguamos que numero de caso es 
+bestPitch = R(bestCase,1); % guardamos su pitch
+bestTime = R(bestCase,2);% guardamos su tiempo
+% WP4 LAUNCH SITES
+siteNames = ["Kourou";
+             "Kennedy";
+             "Vandenberg";
+             "Andoya"];
+
+latitude = [5.2;
+            28.5;
+            34.7;
+            69.0];
+
+vEast = omegaE*rE*cosd(latitude);
+vAlong = vEast*sind(heading);
+vCross = vEast*cosd(heading);
+inclination = acosd(cosd(latitude).*sind(heading));
+GeometryTable = table(siteNames,latitude,vEast,vAlong,...
+                      vCross,inclination);
+disp(GeometryTable)
+%- 
+fprintf('\nBEST FLIGHT\n') %  estamos imprimiendo los datos
+fprintf('Pitch = %.3f deg\n',bestPitch)
+fprintf('Time = %.1f s\n',bestTime)
+fprintf('J = %.4f\n',bestJ)
+% 7. STARTING, BEST AND dt/2
+
+start = sim(7.42,212,dt); % simulamos el startung flight [7.42º, 212]
+best = sim(bestPitch,bestTime,dt); % volvemos a ejecutar el ganador, util porque ahora queremos guardar toda su trayectoria para las graficas 
+bestHalf = sim(bestPitch,bestTime,dt/2); % mismo ganador, mismos controles pero dt= 0.00625s numerical check
+
+fprintf('\nStarting: J = %.4f  Accepted = %d\n',start.J,start.accepted)%mostramos los resultados
+fprintf('Best:     J = %.4f  Accepted = %d\n',best.J,best.accepted)
+fprintf('dt/2:     J = %.4f  Accepted = %d\n',bestHalf.J,bestHalf.accepted)
+
+fprintf('\nStage 1 burnout = %.2f s\n',t1) % muestra cuando termina stage 1
+fprintf('Stage 2 ignition = %.2f s\n',tIgn) % muestra cuando termina el coast de 3 segundos y empieza el stage 2 
+fprintf('Final cutoff = %.2f s\n',tCut) % muestra cuando se apaga stage 2 
+fprintf('Final mass = %.1f kg\n',best.mass) % muestra la masa que queda unida en cutoff
+% 8. OBJECTIVE MAP
+
+Jplot = Jmap; % hacemos una copia de la matriz de J
+Jplot(~isfinite(Jplot)) = NaN; %Si algun J= infinito, lo cambiamos por Nan par no estropear la grafica 
+
+figure % abre una nuevsa figura 
+imagesc(timeGrid,pitchGrid,Jplot) % hace el mapa de colores 
+set(gca,'YDir','normal') % evita que el eje vertical salga invertido
+colorbar % añade la barra que indica que color corresponde a que J 
+hold on % permite añadir puntos encima del mapa 
+
+[row,col] = find(acceptedMap); % busca que posiciones son aceptables 
+scatter(timeGrid(col),pitchGrid(row),50,'o','LineWidth',1.5) % dibuja un circulo encima de cada solución aceptable 
+plot(bestTime,bestPitch,'kp','MarkerSize',14,'LineWidth',2) % marca el mejor caso k= negro, p= marcador tipo pentagono
+
+xlabel('Final pitch time [s]')
+ylabel('Final pitch [deg]')
+title('Objective J')
+% 9. STARTING VS BEST
+figure
+subplot(2,1,1) % dividimos la figura en 2 graficas , seleccionamos la superior
+plot(start.down/1000,start.altitude/1000,'LineWidth',1.5) % dibuja la trayectoria del starting flight
+hold on
+plot(best.down/1000,best.altitude/1000,'LineWidth',1.5) % dibuja el best flight , asi los podemos comparar
+xlabel('Downrange [km]')
+ylabel('Altitude [km]')
+legend('Starting','Best')
+grid on
+
+subplot(2,1,2) % segunda grafica 
+plot(start.time,start.pitch,'LineWidth',1.5) % pitch schedule del starting flight
+hold on
+plot(best.time,best.pitch,'LineWidth',1.5) % pitch schedule del ganador
+xlabel('Time [s]')
+ylabel('Pitch [deg]')
+legend('Starting','Best')
+grid on
+% ONE FLIGHT
+% representa un unico vuelo completo
+    function out = sim(finalPitch,finalTime,dt,latDeg,useRotation) % la función recibe / final pitch, final time y dt)
+    %WP4
+    %function out=sim(finalPitch,finalTime,dt)
+        if nargin < 4
+            latDeg = 0;
+        end
+        if nargin < 5
+            useRotation = false;
+        end
+   
+    % Include staging times exactly
+    time = unique(sort([0:dt:tCut t1 tIgn tCut]))'; % crea 0, 0.0125,0.025... hasta cutoff, despues añadimos t1, tIgn, y tcut para asegurarnos que los eventos importantes estan exactamente dentro del vector, y sort los ordena de menor a mayor, unique elimina los valores repetidos
+    N = length(time); % numero de pasos temporales
+
+    r = [0 rE]; % colocamos el cohete sobre la superficie terrestre 
+    % v = [0 0]; % incialmente  V=0 WP3
+    %WP4 
+    u_r = r/norm(r);
+    u_h = [-u_r(2) u_r(1)];
+    if useRotation
+        vEast0 = omegaE*rE*cosd(latDeg);
+        vAlong0 = vEast0*sind(heading);
+        omegaPlane = vAlong0/rE;
+    else
+        vAlong0 = 0;
+        omegaPlane = 0;
+    end
+    v = vAlong0*u_h;
+    m = m0;
+    % Check: vehicle at rest on pad must have zero airspeed
+    vAtm0 = omegaPlane*rE*u_h;
+    padAirSpeed = norm(v-vAtm0);
+    %m = m0;
+    % vectores donde guardamos altitud, pitch, dynamic pressure, dorwnrange 
+    altitude = zeros(N,1);
+    pitchHist = zeros(N,1);
+    qHist = zeros(N,1);
+    down = zeros(N,1);
+    pitchHist(1) = 90; % inicialmente pitch =90º
+    %WP4 
+    VtHist = zeros(N,1);       
+    VtHist(1) = dot(v,u_h);
+    %
+
+    separated = false; % todavia no hemos separado stage 1 
+    failed = false; % todavia el vuelo no ha fallado
+    last = N; % por defecto suponemos que llegaremos hasta el ultimo instant
+
+    for i = 2:N % vamos recorriendo el vuelo paso a paso
+
+        t = time(i-1); % tiempo actual 
+        dti = time(i)-time(i-1); % paso temporal real , normalmente dti=0.0125 Pero cerca de staging puede ser ligeramente diferente porque hemos insertado exactamente los tiempos de eventos.
+
+        % Remove Stage 1 dry mass at separation
+        if t >= t1 && ~separated % pregunta si stage 1 ya ha terminado y todavia no lo hemos separado
+            m = m-m_dry1; % quitamos la estructura , la velocidad no cambia , solo cambia la masa
+            separated = true; % marcamos que ya ha sido separado
+        end
+
+        % Pitch law
+        pitch = interp1([0 12 100 190 finalTime 700], ... % todo el pitch schedule, interpolamos uniendo los puntos con lineas rectas
+                        [90 90 77 20 finalPitch finalPitch],t);
+        % Position
+        rMod = norm(r); % calculamos la distancia al centro de la tierra
+        h = rMod-rE; % la altitud
+        u_r = r/rMod; % creamos un vector unitario apuntando hacia arriba desde el centro de la tierra, es nuestra vertical local 
+        u_h = [-u_r(2) u_r(1)]; % giramos la radial 90º para obtener la horizontal local
+
+        % Atmosphere and gravity
+        g = mu/rMod^2;
+        rho = rho0*exp(-max(h,0)/H); % el max evita usar una altitud negativa
+
+        % Velocity
+       % V = norm(v);% calculamos la velocidad v= sqrt(vx^2+vy^2)
+
+       % if V > 0 % creamos el vector unitario de la velocidad, lo necesitamos porque el drag va en direccion contraria
+       %     u_v = v/V;
+       % else
+       %     u_v = [0 0]; % cuando V=0 no exsiste una dirección de velocidad definida, asi que usamos 0,0
+       % end
+       % q = 0.5*rho*V^2; % presión dinamica
+       % Atmosphere rotates with Earth WP4
+       vAtm = omegaPlane*rMod*u_h;
+       % Velocity relative to atmosphere
+       vAir = v-vAtm;
+       Vair = norm(vAir);
+       if Vair > 0
+           uAir = vAir/Vair;
+       else
+           uAir = [0 0];
+       end
+       q = 0.5*rho*Vair^2;
+
+
+        % Which stage?
+        if t < t1 % si todavia no hemos llegado al burnout del stage 1 , usamos stage 1
+            Tmag = T1;
+            mdot = mdot1;
+            A = A1;
+            Cd = Cd1;
+
+        elseif t < tIgn % si stage 1 ha terminado pero todavia no han pasado los 3s, estamos en COAST
+            Tmag = 0;
+            mdot = 0;
+            A = A2;
+            Cd = Cd2;
+
+        else % despues de stage 2 ignition
+            Tmag = T2;
+            mdot = mdot2;
+            A = A2;
+            Cd = Cd2;
+        end
+
+        % Forces
+        u_T = cosd(pitch)*u_h + sind(pitch)*u_r; % transformamos pitch en un vector, si pitch =90º el thrust apunta radialmente hacia arriba, si =0, apunta horizontalmente
+        T = Tmag*u_T; % creamos el vector
+        W = -m*g*u_r; % calculamos -m x g x ur , el signo negativo significa hacia el centro de la tierra
+        %D = -q*Cd*A*u_v; % el signo negativo hace que el drag vaya contra la velocidad
+        D=-q*Cd*A*uAir; %WP4
+        a = (T+W+D)/m; % sumamos las fuerzas y usamos a= F/m
+
+        % Forward Euler
+        r = r + v*dti;
+        v = v + a*dti;
+        %WP4
+        rNew=norm(r);
+        u_r_new=r/rNew;
+        u_h_new=[-u_r_new(2) u_r_new(1)];
+        VtHist(i)=dot(v,u_h_new);
+        %
+        m = m-mdot*dti;
+
+        % Save resoults
+        altitude(i) = norm(r)-rE; 
+        pitchHist(i) = pitch;
+        qHist(i) = q;
+       
+        angle = atan2(r(2),r(1)); % calculamos el angulo alrededor de la tierra correspondiente a nuestra posición
+        down(i) = rE*(angle-pi/2); %convertimos ese angulo en distancia recorrida sobre la superficie  s= Re x variación de pitch
+
+        % Impact
+        if norm(r) <= rE && t > 1 % si r<Re hemos tocado la superficie
+            failed = true; % vuelo fallido 
+            last = i; % guardamos el ultimo punto valido
+            break
+        end
+    end
+    % FINAL ORBIT
+    rf = norm(r); % radio final 
+    Vf = norm(v); % velocidad total final
+    % volvemos a contruir vertical y horizontales locales en el punto de
+    % cutoff
+    u_r = r/rf;
+    u_h = [-u_r(2) u_r(1)];
+    Vr = dot(v,u_r); % proyectamos la velocidad sobre la dirección radial, si Vr> o, subiendo si no, bajando, para orbita circular queremos Vr=0
+    Vt = dot(v,u_h); % proyectamos sobre la horizontal Vt 
+    energy = Vf^2/2-mu/rf; % energia orbital
+    hOrb = abs(r(1)*v(2)-r(2)*v(1)); % momento angular, el producto vectorial en 2D
+    if hOrb > 0
+        e = sqrt(max(0,1+2*energy*hOrb^2/mu^2)); % eccentricity
+        rp = (hOrb^2/mu)/(1+e);
+        hp = rp-rE;
+
+        if energy < 0 % solo calculamos apogeo si la orbita es cerrada
+            a = -mu/(2*energy);
+            ha = a*(1+e)-rE; % radio apogeo 
+        else
+            ha = Inf; % si la orbita no esta ligada no exsiste apogeo finito
+        end
+    else
+        hp = NaN;
+        ha = Inf;
+    end
+    % ERRORS
+
+    err = [abs(rf-rTarget), ... % crea los errores
+           abs(Vr), ...
+           abs(Vt-VTarget), ...
+           abs(hp-hTarget), ...
+           abs(ha-hTarget)];
+
+    Qmax = max(qHist(1:last)); % busca el mayor valor de q durante todo el vuelo
+
+    if ~failed && all(isfinite(err)) % solo calculamos J si el vuelo no ha fallado y los errores son valores normales
+        J = max(err./limits); % err./limits divide Er, Evr,Evt, Ehp, Eha, por 500,25,25,5000,5000, y despues escoge el maximo
+    else
+        J = Inf; % si el vuelo falla J = a infinito, para que nunca pueda ser seleccionado como mejor
+    end
+
+    accepted = ~failed && energy < 0 && hOrb > 0 && hp > 0 ... % pregunta si se cumple todo simultaniamente
+               && all(err <= limits) && Qmax <= Qlimit; % los cinco errores estan dentro de sus tolerancias 
+    % OUTPUT
+
+    out.J = J; % guardamos J
+    out.err = err; % guardamos los 5 errores 
+
+    out.hp = hp; % guardamos perigeo y apogeo
+    out.ha = ha;
+    out.Qmax = Qmax;
+
+    out.accepted = accepted; % guardamos si el vuelos es aceptable
+    out.failed = failed; % guardamos si falla
+    out.mass = m; % guardamos la masa final 
+
+    out.time = time(1:last); % guardamos las historias temporales para hacer graficas
+    out.altitude = altitude(1:last);
+    out.pitch = pitchHist(1:last);
+    out.down = down(1:last);
+    % WP4
+    out.hcut = rf-rE;
+    out.Vr = Vr;
+    out.Vt = Vt;
+    out.VtHist = VtHist(1:last);
+    out.padAirSpeed = padAirSpeed;
+
+    end
+%WP4 SIMULATIONS
+% Non-rotating baseline
+baseline = sim(bestPitch,bestTime,dt,0,false);
+
+% Four launch sites
+for s=1:4
+
+    flight(s)=sim(bestPitch,bestTime,dt,latitude(s),true);
+
+end
+% TABLE WP4 
+CutoffAltitude=zeros(4,1);
+VrCut=zeros(4,1);
+VtCut=zeros(4,1);
+Perigee=zeros(4,1);
+Apogee=zeros(4,1);
+Qmax=zeros(4,1);
+Accepted=false(4,1);
+
+for s=1:4
+
+    CutoffAltitude(s)=flight(s).hcut/1000;
+    VrCut(s)=flight(s).Vr;
+    VtCut(s)=flight(s).Vt;
+    Perigee(s)=flight(s).hp/1000;
+    Apogee(s)=flight(s).ha/1000;
+    Qmax(s)=flight(s).Qmax/1000;
+    Accepted(s)=flight(s).accepted;
+
+end
+
+ResultsWP4=table(siteNames,latitude,vEast,vAlong,vCross,...
+    inclination,CutoffAltitude,VrCut,VtCut,...
+    Perigee,Apogee,Qmax,Accepted);
+
+disp(ResultsWP4)
+
+% ALTITUDE
+
+figure
+
+plot(baseline.time,baseline.altitude/1000,'--','LineWidth',1.5)
+hold on
+
+for s=1:4
+    plot(flight(s).time,flight(s).altitude/1000,'LineWidth',1.5)
+end
+
+xlabel('Time [s]')
+ylabel('Altitude [km]')
+title('Altitude profiles')
+
+legend('No rotation','Kourou','Kennedy',...
+       'Vandenberg','Andoya')
+
+grid on
+
+% INERTIAL TRANSVERSE SPEED
+
+figure
+
+plot(baseline.time,baseline.VtHist,'--','LineWidth',1.5)
+hold on
+
+for s=1:4
+    plot(flight(s).time,flight(s).VtHist,'LineWidth',1.5)
+end
+
+xlabel('Time [s]')
+ylabel('Inertial transverse speed [m/s]')
+title('Inertial transverse-speed profiles')
+
+legend('No rotation','Kourou','Kennedy',...
+       'Vandenberg','Andoya')
+
+grid on
+
+% HALF STEP CHECK
+
+half = sim(bestPitch,bestTime,dt/2,latitude(1),true);
+
+fprintf('\nKOUROU HALF STEP\n')
+
+fprintf('Altitude: %.3f / %.3f km\n',...
+    flight(1).hcut/1000,half.hcut/1000)
+
+fprintf('Vr: %.3f / %.3f m/s\n',...
+    flight(1).Vr,half.Vr)
+
+fprintf('Vt: %.3f / %.3f m/s\n',...
+    flight(1).Vt,half.Vt)
+
+fprintf('Perigee: %.3f / %.3f km\n',...
+    flight(1).hp/1000,half.hp/1000)
+
+fprintf('Apogee: %.3f / %.3f km\n',...
+    flight(1).ha/1000,half.ha/1000)
+%AIRE QUIETO RESPECTO COHETE 
+fprintf('\nINITIAL AIRSPEED\n')
+
+for s=1:4
+    fprintf('%s = %.8f m/s\n',...
+        siteNames(s),flight(s).padAirSpeed)
+end
+
+end
+
