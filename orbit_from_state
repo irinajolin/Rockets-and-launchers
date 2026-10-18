@@ -1,6 +1,4 @@
 function orb = orbit_from_state(r,v,mu,rE)
-% ORBITAL QUANTITIES FROM A 2D INERTIAL STATE
-% Used in WP2, WP3 and WP4.
 
 rf = norm(r);
 Vf = norm(v);
@@ -8,45 +6,29 @@ Vf = norm(v);
 u_r = r/rf;
 u_h = [-u_r(2) u_r(1)];
 
-Vr = dot(v,u_r);
-Vt = dot(v,u_h);
+orb.rf = rf;
+orb.Vr = dot(v,u_r);
+orb.Vt = dot(v,u_h);
 
-energy = Vf^2/2-mu/rf;
-hOrb = abs(r(1)*v(2)-r(2)*v(1));
+orb.energy = Vf^2/2-mu/rf;
+orb.hOrb = abs(r(1)*v(2)-r(2)*v(1));
 
-if hOrb > 0
-    e = sqrt(max(0,1+2*energy*hOrb^2/mu^2));
-    rp = (hOrb^2/mu)/(1+e);
-    hp = rp-rE;
+if orb.hOrb > 0
+    orb.e = sqrt(max(0,1+2*orb.energy*orb.hOrb^2/mu^2));
 
-    if energy < 0
-        a = -mu/(2*energy);
-        ra = a*(1+e);
-        ha = ra-rE;
+    rp = (orb.hOrb^2/mu)/(1+orb.e);
+    orb.hp = rp-rE;
+
+    if orb.energy < 0
+        a = -mu/(2*orb.energy);
+        orb.ha = a*(1+orb.e)-rE;
     else
-        a = Inf;
-        ra = Inf;
-        ha = Inf;
+        orb.ha = Inf;
     end
 else
-    e = NaN;
-    a = NaN;
-    rp = NaN;
-    ra = Inf;
-    hp = NaN;
-    ha = Inf;
+    orb.e = NaN;
+    orb.hp = NaN;
+    orb.ha = Inf;
 end
 
-orb.rf = rf;
-orb.Vf = Vf;
-orb.Vr = Vr;
-orb.Vt = Vt;
-orb.energy = energy;
-orb.hOrb = hOrb;
-orb.e = e;
-orb.a = a;
-orb.rp = rp;
-orb.ra = ra;
-orb.hp = hp;
-orb.ha = ha;
 end
