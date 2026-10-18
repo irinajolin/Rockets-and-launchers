@@ -1,0 +1,165 @@
+function WP3(task)
+clc; close all;
+
+        %% =========================================================
+        % WP3 TASK 1 - ONE STAGE VS TWO STAGES
+        %% =========================================================
+
+        g0 = 9.80665;
+        Isp = 2250;
+
+        % Ideal delta-v
+        m0 = 46000;
+
+        mfSingle = 28000;
+        dvSingle = Isp*g0*log(m0/mfSingle);
+
+        m01 = 46000;
+        mf1 = 36000;
+        m02 = 24000;
+        mf2 = 16000;
+
+        dv1 = Isp*g0*log(m01/mf1);
+        dv2 = Isp*g0*log(m02/mf2);
+        dvTwo = dv1+dv2;
+
+        % Simulations
+        single = simulate_wp3_task1(false);
+        two = simulate_wp3_task1(true);
+
+        fprintf('IDEAL DELTA-V\n')
+        fprintf('Single stage = %.2f m/s\n',dvSingle)
+        fprintf('Two stage    = %.2f m/s\n\n',dvTwo)
+
+        fprintf('SIMULATED CUTOFF SPEED\n')
+        fprintf('Single stage = %.2f m/s\n',single.cutoffSpeed)
+        fprintf('Two stage    = %.2f m/s\n\n',two.cutoffSpeed)
+
+        fprintf('CUTOFF SPECIFIC ORBITAL ENERGY\n')
+        fprintf('Single stage = %.2f J/kg\n',single.cutoffEnergy)
+        fprintf('Two stage    = %.2f J/kg\n',two.cutoffEnergy)
+
+        figure
+        plot(single.time,single.mass,'LineWidth',1.5); hold on
+        plot(two.time,two.mass,'LineWidth',1.5)
+        xlabel('Time [s]'); ylabel('Attached mass [kg]')
+        legend('One stage','Two stages'); grid on
+        title('Mass versus time')
+
+        figure
+        plot(single.time,vecnorm(single.v,2,2),'LineWidth',1.5); hold on
+        plot(two.time,vecnorm(two.v,2,2),'LineWidth',1.5)
+        xlabel('Time [s]'); ylabel('Speed [m/s]')
+        legend('One stage','Two stages'); grid on
+        title('Speed comparison')
+
+        %% =========================================================
+        % WP3 TASK 2 - GRID SEARCH
+        %% =========================================================
+
+        pitchGrid = 7.22:0.025:7.42;
+        timeGrid = 208:0.5:212;
+        dt = 0.0125;
+
+        nPitch = length(pitchGrid);
+        nTime = length(timeGrid);
+        nCases = nPitch*nTime;
+
+        % pitch time J 5 errors hp ha Qmax accepted failed
+        R = zeros(nCases,13);
+        Jmap = zeros(nPitch,nTime);
+        acceptedMap = false(nPitch,nTime);
+
+        k = 0;
+        for ip = 1:nPitch
+            for it = 1:nTime
+                k = k+1;
+
+                pf = pitchGrid(ip);
+                tf = timeGrid(it);
+
+                out = sim_staged(pf,tf,dt,0,false);
+
+                R(k,:) = [pf tf out.J out.err out.hp out.ha ...
+                    out.Qmax out.accepted out.failed];
+
+                Jmap(ip,it) = out.J;
+                acceptedMap(ip,it) = out.accepted;
+            end
+        end
+
+        % Results table
+        Status = repmat("Completed-unacceptable",nCases,1);
+        Status(logical(R(:,12))) = "Acceptable";
+        Status(logical(R(:,13))) = "Failed";
+
+        Results = array2table(R(:,1:12));
+        Results.Properties.VariableNames = { ...
+            'Pitch','Time','J','rError','VrError','VtError', ...
+            'hpError','haError','Perigee','Apogee','Qmax','Accepted'};
+        Results.Status = Status;
+        disp(Results)
+
+        % Best acceptable flight
+        valid = find(R(:,12)==1);
+
+        if isempty(valid)
+            disp('NO ACCEPTABLE FLIGHT FOUND')
+            return
+        end
+
+        [bestJ,pos] = min(R(valid,3));
+        bestCase = valid(pos);
+        bestPitch = R(bestCase,1);
+        bestTime = R(bestCase,2);
+
+        fprintf('\nBEST FLIGHT\n')
+        fprintf('Pitch = %.3f deg\n',bestPitch)
+        fprintf('Time = %.1f s\n',bestTime)
+        fprintf('J = %.4f\n',bestJ)
+
+        % Starting, best, half-step
+        start = sim_staged(7.42,212,dt,0,false);
+        best = sim_staged(bestPitch,bestTime,dt,0,false);
+        bestHalf = sim_staged(bestPitch,bestTime,dt/2,0,false);
+
+        fprintf('\nStarting: J = %.4f Accepted = %d\n',start.J,start.accepted)
+        fprintf('Best:     J = %.4f Accepted = %d\n',best.J,best.accepted)
+        fprintf('dt/2:     J = %.4f Accepted = %d\n',bestHalf.J,bestHalf.accepted)
+
+        fprintf('\nStage 1 burnout = %.2f s\n',best.t1)
+        fprintf('Stage 2 ignition = %.2f s\n',best.tIgn)
+        fprintf('Final cutoff = %.2f s\n',best.tCut)
+        fprintf('Final mass = %.1f kg\n',best.mass)
+
+        % Objective map
+        Jplot = Jmap;
+        Jplot(~isfinite(Jplot)) = NaN;
+
+        figure
+        imagesc(timeGrid,pitchGrid,Jplot)
+        set(gca,'YDir','normal')
+        colorbar; hold on
+        [row,col] = find(acceptedMap);
+        scatter(timeGrid(col),pitchGrid(row),50,'o','LineWidth',1.5)
+        plot(bestTime,bestPitch,'kp','MarkerSize',14,'LineWidth',2)
+        xlabel('Final pitch time [s]')
+        ylabel('Final pitch [deg]')
+        title('Objective J')
+
+        % Starting vs best
+        figure
+        subplot(2,1,1)
+        plot(start.down/1000,start.altitude/1000,'LineWidth',1.5); hold on
+        plot(best.down/1000,best.altitude/1000,'LineWidth',1.5)
+        xlabel('Downrange [km]'); ylabel('Altitude [km]')
+        legend('Starting','Best'); grid on
+
+        subplot(2,1,2)
+        plot(start.time,start.pitch,'LineWidth',1.5); hold on
+        plot(best.time,best.pitch,'LineWidth',1.5)
+        xlabel('Time [s]'); ylabel('Pitch [deg]')
+        legend('Starting','Best'); grid on
+
+   
+end
