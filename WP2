@@ -1,0 +1,111 @@
+function WP2(task)
+clc; close all;
+
+
+        %% =========================================================
+        % WP2 TASK 1 - INTERACTIVE PITCH TURN
+        %% =========================================================
+
+        fig = figure('Name','WP2 Task 1 - Pitch Schedule', ...
+            'NumberTitle','off','Position',[100 100 1100 700]);
+
+        pnl = uipanel(fig,'Position',[0.02 0.02 0.96 0.12], ...
+            'Title','Pitch Schedule Control');
+
+        uilabel(pnl,'Position',[20 25 200 22], ...
+            'Text','Turn start t_{turn} [s]:');
+
+        slider = uislider(pnl,'Position',[220 35 600 3], ...
+            'Limits',[5 60],'Value',20);
+
+        label = uilabel(pnl,'Position',[840 25 100 22], ...
+            'Text','20.0 s');
+
+        ax1 = subplot(2,2,1,'Parent',fig); grid(ax1,'on')
+        title(ax1,'Trajectory'); xlabel(ax1,'Downrange [km]'); ylabel(ax1,'Altitude [km]')
+
+        ax2 = subplot(2,2,2,'Parent',fig); grid(ax2,'on')
+        title(ax2,'Dynamic pressure'); xlabel(ax2,'Time [s]'); ylabel(ax2,'Q [kPa]')
+
+        ax3 = subplot(2,2,3,'Parent',fig); grid(ax3,'on')
+        title(ax3,'Pitch and flight-path angle'); xlabel(ax3,'Time [s]'); ylabel(ax3,'Angle [deg]')
+
+        ax4 = subplot(2,2,4,'Parent',fig); grid(ax4,'on')
+        title(ax4,'Transverse velocity'); xlabel(ax4,'Time [s]'); ylabel(ax4,'V_t [m/s]')
+
+        updatePlots(slider.Value)
+        slider.ValueChangedFcn = @(src,event) updatePlots(src.Value);
+
+        function updatePlots(t_turn)
+            label.Text = sprintf('%.1f s',t_turn);
+
+            data = simulate_wp2_pitch(t_turn);
+
+            cla(ax1); cla(ax2); cla(ax3); cla(ax4)
+
+            plot(ax1,data.downrange/1000,data.h/1000,'LineWidth',1.5)
+            plot(ax2,data.t,data.Q/1000,'LineWidth',1.5)
+
+            plot(ax3,data.t,rad2deg(data.psi),'--','LineWidth',1.5)
+            hold(ax3,'on')
+            plot(ax3,data.t,rad2deg(data.gamma),'LineWidth',1.5)
+            legend(ax3,'Pitch','Flight-path angle')
+
+            plot(ax4,data.t,data.Vt,'LineWidth',1.5)
+        end
+
+        %% =========================================================
+        % WP2 TASK 2 - CIRCULAR SPEED IS NOT ENOUGH
+        %% =========================================================
+
+        RE = 6374.2e3;
+        mu = 3.986e14;
+
+        hTarget = 300e3;
+        r0 = RE+hTarget;
+        Vc = sqrt(mu/r0);
+
+        gammas = [0 7.7 30.1];
+        dt = 1;
+        coastTime = 100*60;
+
+        figure
+        hold on; axis equal; grid on
+
+        for k = 1:length(gammas)
+            gamma = gammas(k);
+
+            Vr = Vc*sind(gamma);
+            Vt = Vc*cosd(gamma);
+
+            r = [r0 0];
+            v = [Vr Vt];
+
+            orb = orbit_from_state(r,v,mu,RE);
+            coast = propagate_coast(r0,Vr,Vt,dt,coastTime);
+
+            energyError = max(abs((coast.energy-coast.energy(1))/coast.energy(1)))*100;
+            hError = max(abs((coast.hMomentum-coast.hMomentum(1))/coast.hMomentum(1)))*100;
+
+            fprintf('\nGAMMA = %.1f deg\n',gamma)
+            fprintf('Vc = %.2f m/s\n',Vc)
+            fprintf('Vr = %.2f m/s\n',Vr)
+            fprintf('Vt = %.2f m/s\n',Vt)
+            fprintf('e = %.4f\n',orb.e)
+            fprintf('Perigee = %.2f km\n',orb.hp/1000)
+            fprintf('Apogee = %.2f km\n',orb.ha/1000)
+            fprintf('Energy error = %.4f %%\n',energyError)
+            fprintf('Angular momentum error = %.4f %%\n',hError)
+
+            plot(coast.x/1000,coast.y/1000,'LineWidth',1.5)
+        end
+
+        ang = linspace(0,2*pi,400);
+        plot(RE*cos(ang)/1000,RE*sin(ang)/1000,'k','LineWidth',1.5)
+        legend('gamma 0','gamma 7.7','gamma 30.1','Earth')
+        xlabel('x [km]'); ylabel('y [km]')
+        title('Coast trajectories')
+
+ 
+end
+
