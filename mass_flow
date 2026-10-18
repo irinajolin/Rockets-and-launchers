@@ -1,0 +1,9 @@
+function mdot = mass_flow(T,Isp,g0)
+
+if T > 0 && Isp > 0
+    mdot = T/(Isp*g0);
+else
+    mdot = 0;
+end
+
+end
