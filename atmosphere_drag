@@ -1,0 +1,12 @@
+function [rho,q,D] = atmosphere_drag(h,V,Cd,A,rho0,H,useAtmosphere)
+
+if useAtmosphere
+    rho = rho0*exp(-max(h,0)/H);
+else
+    rho = 0;
+end
+
+q = 0.5*rho*V^2;
+D = q*Cd*A;
+
+end
