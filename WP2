@@ -1,111 +1,316 @@
 function WP2(task)
+% WP2 - Task 1 and Task 2
+
 clc; close all;
 
+if nargin < 1
+    task = input('WP2 - Choose Task 1 or 2: ');
+end
 
-        %% =========================================================
-        % WP2 TASK 1 - INTERACTIVE PITCH TURN
-        %% =========================================================
+[g0,mu,rE,rho0,rE_wp2] = constants();
 
-        fig = figure('Name','WP2 Task 1 - Pitch Schedule', ...
-            'NumberTitle','off','Position',[100 100 1100 700]);
+switch task
 
-        pnl = uipanel(fig,'Position',[0.02 0.02 0.96 0.12], ...
-            'Title','Pitch Schedule Control');
+    case 1
+        %% TASK 1 - EARLY / BASELINE / LATE + SLIDER
 
-        uilabel(pnl,'Position',[20 25 200 22], ...
-            'Text','Turn start t_{turn} [s]:');
+        early = sim_pitch(10,g0,rE,rho0);
+        baseline = sim_pitch(20,g0,rE,rho0);
+        late = sim_pitch(40,g0,rE,rho0);
 
-        slider = uislider(pnl,'Position',[220 35 600 3], ...
-            'Limits',[5 60],'Value',20);
+        Turn = [10;20;40];
+        hCut_km = [early.hCut;baseline.hCut;late.hCut]/1000;
+        VCut = [early.VCut;baseline.VCut;late.VCut];
+        VtCut = [early.VtCut;baseline.VtCut;late.VtCut];
+        Qmax_kPa = [early.Qmax;baseline.Qmax;late.Qmax]/1000;
 
-        label = uilabel(pnl,'Position',[840 25 100 22], ...
-            'Text','20.0 s');
-
-        ax1 = subplot(2,2,1,'Parent',fig); grid(ax1,'on')
-        title(ax1,'Trajectory'); xlabel(ax1,'Downrange [km]'); ylabel(ax1,'Altitude [km]')
-
-        ax2 = subplot(2,2,2,'Parent',fig); grid(ax2,'on')
-        title(ax2,'Dynamic pressure'); xlabel(ax2,'Time [s]'); ylabel(ax2,'Q [kPa]')
-
-        ax3 = subplot(2,2,3,'Parent',fig); grid(ax3,'on')
-        title(ax3,'Pitch and flight-path angle'); xlabel(ax3,'Time [s]'); ylabel(ax3,'Angle [deg]')
-
-        ax4 = subplot(2,2,4,'Parent',fig); grid(ax4,'on')
-        title(ax4,'Transverse velocity'); xlabel(ax4,'Time [s]'); ylabel(ax4,'V_t [m/s]')
-
-        updatePlots(slider.Value)
-        slider.ValueChangedFcn = @(src,event) updatePlots(src.Value);
-
-        function updatePlots(t_turn)
-            label.Text = sprintf('%.1f s',t_turn);
-
-            data = simulate_wp2_pitch(t_turn);
-
-            cla(ax1); cla(ax2); cla(ax3); cla(ax4)
-
-            plot(ax1,data.downrange/1000,data.h/1000,'LineWidth',1.5)
-            plot(ax2,data.t,data.Q/1000,'LineWidth',1.5)
-
-            plot(ax3,data.t,rad2deg(data.psi),'--','LineWidth',1.5)
-            hold(ax3,'on')
-            plot(ax3,data.t,rad2deg(data.gamma),'LineWidth',1.5)
-            legend(ax3,'Pitch','Flight-path angle')
-
-            plot(ax4,data.t,data.Vt,'LineWidth',1.5)
-        end
-
-        %% =========================================================
-        % WP2 TASK 2 - CIRCULAR SPEED IS NOT ENOUGH
-        %% =========================================================
-
-        RE = 6374.2e3;
-        mu = 3.986e14;
-
-        hTarget = 300e3;
-        r0 = RE+hTarget;
-        Vc = sqrt(mu/r0);
-
-        gammas = [0 7.7 30.1];
-        dt = 1;
-        coastTime = 100*60;
+        CutoffTable = table(Turn,hCut_km,VCut,VtCut,Qmax_kPa);
+        disp(CutoffTable)
 
         figure
-        hold on; axis equal; grid on
+        subplot(1,2,1)
+        plot(early.x/1000,early.h/1000,'LineWidth',1.5); hold on
+        plot(baseline.x/1000,baseline.h/1000,'LineWidth',1.5)
+        plot(late.x/1000,late.h/1000,'LineWidth',1.5)
+        xlabel('Downrange [km]'); ylabel('Altitude [km]')
+        legend('Early','Baseline','Late'); grid on
 
-        for k = 1:length(gammas)
-            gamma = gammas(k);
+        subplot(1,2,2)
+        plot(early.t,early.Q/1000,'LineWidth',1.5); hold on
+        plot(baseline.t,baseline.Q/1000,'LineWidth',1.5)
+        plot(late.t,late.Q/1000,'LineWidth',1.5)
+        xlabel('Time [s]'); ylabel('Q [kPa]')
+        legend('Early','Baseline','Late'); grid on
+
+        % Interactive slider
+        fig = uifigure('Name','WP2 Task 1','Position',[100 100 1100 700]);
+
+        slider = uislider(fig,'Position',[220 50 600 3],...
+            'Limits',[5 60],'Value',20);
+
+        label = uilabel(fig,'Position',[840 40 130 22]);
+
+        ax1 = uiaxes(fig,'Position',[60 390 450 230]);
+        ax2 = uiaxes(fig,'Position',[580 390 450 230]);
+        ax3 = uiaxes(fig,'Position',[60 120 450 230]);
+        ax4 = uiaxes(fig,'Position',[580 120 450 230]);
+
+        slider.ValueChangedFcn = @(src,event) updatePlots(...
+            src.Value,label,ax1,ax2,ax3,ax4,g0,rE,rho0);
+
+        updatePlots(slider.Value,label,ax1,ax2,ax3,ax4,g0,rE,rho0);
+
+
+    case 2
+        %% TASK 2 - INSERTION CLAIM
+
+        rE = rE_wp2;
+        hTarget = 300e3;
+        r0 = rE+hTarget;
+        Vc = sqrt(mu/r0);
+
+        gammaCases = [0 10 30];
+        coastTime = 6000;
+        dt = 1;
+
+        figure; hold on
+
+        for k = 1:length(gammaCases)
+
+            gamma = gammaCases(k);
 
             Vr = Vc*sind(gamma);
             Vt = Vc*cosd(gamma);
 
-            r = [r0 0];
-            v = [Vr Vt];
+            orb = orbit_from_state([r0 0],[Vr Vt],mu,rE);
 
-            orb = orbit_from_state(r,v,mu,RE);
-            coast = propagate_coast(r0,Vr,Vt,dt,coastTime);
+            [x,y,energy,hMomentum,impact] = ...
+                coast(r0,Vr,Vt,dt,coastTime,mu,rE);
 
-            energyError = max(abs((coast.energy-coast.energy(1))/coast.energy(1)))*100;
-            hError = max(abs((coast.hMomentum-coast.hMomentum(1))/coast.hMomentum(1)))*100;
+            energyError = max(abs((energy-energy(1))/energy(1)))*100;
+            hError = max(abs((hMomentum-hMomentum(1))/hMomentum(1)))*100;
 
-            fprintf('\nGAMMA = %.1f deg\n',gamma)
-            fprintf('Vc = %.2f m/s\n',Vc)
-            fprintf('Vr = %.2f m/s\n',Vr)
-            fprintf('Vt = %.2f m/s\n',Vt)
-            fprintf('e = %.4f\n',orb.e)
-            fprintf('Perigee = %.2f km\n',orb.hp/1000)
-            fprintf('Apogee = %.2f km\n',orb.ha/1000)
+            fprintf('\nGamma = %.1f deg\n',gamma)
+            fprintf('Vr = %.3f km/s, Vt = %.3f km/s\n',Vr/1000,Vt/1000)
+            fprintf('e = %.4f, hp = %.1f km, ha = %.1f km\n',...
+                orb.e,orb.hp/1000,orb.ha/1000)
             fprintf('Energy error = %.4f %%\n',energyError)
             fprintf('Angular momentum error = %.4f %%\n',hError)
+            fprintf('Impact = %d\n',impact)
 
-            plot(coast.x/1000,coast.y/1000,'LineWidth',1.5)
+            plot(x/1000,y/1000,'LineWidth',1.5)
         end
 
-        ang = linspace(0,2*pi,400);
-        plot(RE*cos(ang)/1000,RE*sin(ang)/1000,'k','LineWidth',1.5)
-        legend('gamma 0','gamma 7.7','gamma 30.1','Earth')
-        xlabel('x [km]'); ylabel('y [km]')
-        title('Coast trajectories')
+        th = linspace(0,2*pi,300);
+        plot(rE*cos(th)/1000,rE*sin(th)/1000,'k','LineWidth',1.5)
 
- 
+        axis equal; grid on
+        xlabel('x [km]'); ylabel('y [km]')
+        legend('\gamma = 0','\gamma = 10','\gamma = 30','Earth')
+
+        % Deliberate impact test
+        [~,~,~,~,impactTest] = ...
+            coast(r0,0,0.5*Vc,dt,coastTime,mu,rE);
+
+        fprintf('\nDELIBERATE IMPACT TEST\n')
+        fprintf('Impact detected = %d\n',impactTest)
+
+    otherwise
+        disp('Choose Task 1 or Task 2')
 end
 
+end
+
+
+function updatePlots(t_turn,label,ax1,ax2,ax3,ax4,g0,rE,rho0)
+
+data = sim_pitch(t_turn,g0,rE,rho0);
+label.Text = sprintf('t_{turn} = %.1f s',t_turn);
+
+cla(ax1); cla(ax2); cla(ax3); cla(ax4)
+
+plot(ax1,data.x/1000,data.h/1000,'LineWidth',1.5)
+xlabel(ax1,'Downrange [km]')
+ylabel(ax1,'Altitude [km]')
+grid(ax1,'on')
+
+plot(ax2,data.t,data.Q/1000,'LineWidth',1.5)
+xlabel(ax2,'Time [s]')
+ylabel(ax2,'Q [kPa]')
+grid(ax2,'on')
+
+plot(ax3,data.t,rad2deg(data.psi),'--','LineWidth',1.5)
+hold(ax3,'on')
+plot(ax3,data.t,rad2deg(data.gamma),'LineWidth',1.5)
+legend(ax3,'Pitch','Flight path')
+grid(ax3,'on')
+
+plot(ax4,data.t,data.Vt,'LineWidth',1.5)
+xlabel(ax4,'Time [s]')
+ylabel(ax4,'V_t [m/s]')
+grid(ax4,'on')
+
+end
+
+
+function sim = sim_pitch(t_turn,g0,rE,rho0)
+
+m0 = 100000;
+mdry = 12000;
+tb = 200;
+
+Isp = 280;
+S = 7;
+Cd = 0.3;
+H = 7500;
+
+mdot = (m0-mdry)/tb;
+Thrust = mdot*g0*Isp;
+
+dt = 0.05;
+t = 0:dt:1200;
+N = length(t);
+
+h = zeros(1,N);
+x = zeros(1,N);
+V = zeros(1,N);
+gamma = zeros(1,N);
+m = zeros(1,N);
+psi = zeros(1,N);
+Q = zeros(1,N);
+Vt = zeros(1,N);
+
+V(1) = 0.1;
+gamma(1) = deg2rad(89.9);
+m(1) = m0;
+
+last = N;
+
+for i = 1:N-1
+
+    ti = t(i);
+
+    if ti < tb
+        T = Thrust;
+        mdotNow = mdot;
+    else
+        T = 0;
+        mdotNow = 0;
+    end
+
+    if ti < t_turn
+        ps = deg2rad(89.9);
+    elseif ti < t_turn+80
+        ps = deg2rad(89.9)-deg2rad(65)*(ti-t_turn)/80;
+    else
+        ps = deg2rad(24.9);
+    end
+
+    [~,Q(i),D] = atmosphere_drag(...
+        h(i),V(i),Cd,S,rho0,H,true);
+
+    alpha = ps-gamma(i);
+
+    r = rE+h(i);
+    g = g0*(rE/r)^2;
+
+    dVdt = (T*cos(alpha)-D)/m(i)-g*sin(gamma(i));
+
+    Vsafe = max(V(i),0.1);
+    dgdt = (T*sin(alpha))/(m(i)*Vsafe) ...
+         -(g/Vsafe-Vsafe/r)*cos(gamma(i));
+
+    dhdt = V(i)*sin(gamma(i));
+    dxdt = V(i)*cos(gamma(i))*(rE/r);
+
+    psi(i) = ps;
+    Vt(i) = V(i)*cos(gamma(i));
+
+    % Forward Euler
+    h(i+1) = h(i)+dhdt*dt;
+    x(i+1) = x(i)+dxdt*dt;
+    V(i+1) = max(0.1,V(i)+dVdt*dt);
+    gamma(i+1) = gamma(i)+dgdt*dt;
+    m(i+1) = max(mdry,m(i)-mdotNow*dt);
+
+    if h(i+1) < 0
+        last = i+1;
+        break
+    end
+end
+
+psi(last) = psi(max(1,last-1));
+
+[~,Q(last),~] = atmosphere_drag(...
+    h(last),V(last),Cd,S,rho0,H,true);
+
+Vt(last) = V(last)*cos(gamma(last));
+
+idxCut = find(t(1:last) <= tb,1,'last');
+
+sim.t = t(1:last);
+sim.h = h(1:last);
+sim.x = x(1:last);
+sim.V = V(1:last);
+sim.gamma = gamma(1:last);
+sim.psi = psi(1:last);
+sim.Q = Q(1:last);
+sim.Vt = Vt(1:last);
+
+sim.hCut = h(idxCut);
+sim.VCut = V(idxCut);
+sim.VtCut = Vt(idxCut);
+sim.Qmax = max(Q(1:idxCut));
+
+end
+
+
+function [x,y,energy,hMomentum,impact] = ...
+    coast(r0,Vr,Vt,dt,tEnd,mu,rE)
+
+N = floor(tEnd/dt)+1;
+
+x = zeros(1,N);
+y = zeros(1,N);
+vx = zeros(1,N);
+vy = zeros(1,N);
+
+x(1) = r0;
+vx(1) = Vr;
+vy(1) = Vt;
+
+last = N;
+impact = false;
+
+for i = 1:N-1
+
+    r = sqrt(x(i)^2+y(i)^2);
+
+    ax = -mu*x(i)/r^3;
+    ay = -mu*y(i)/r^3;
+
+    % Forward Euler
+    x(i+1) = x(i)+vx(i)*dt;
+    y(i+1) = y(i)+vy(i)*dt;
+    vx(i+1) = vx(i)+ax*dt;
+    vy(i+1) = vy(i)+ay*dt;
+
+    if sqrt(x(i+1)^2+y(i+1)^2) <= rE
+        last = i+1;
+        impact = true;
+        break
+    end
+end
+
+x = x(1:last);
+y = y(1:last);
+vx = vx(1:last);
+vy = vy(1:last);
+
+r = sqrt(x.^2+y.^2);
+V2 = vx.^2+vy.^2;
+
+energy = 0.5*V2-mu./r;
+hMomentum = x.*vy-y.*vx;
+
+end
