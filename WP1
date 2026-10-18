@@ -1,147 +1,212 @@
 function WP1(task)
+% WP1 - Task 1 and Task 2
+
 clc; close all;
 
-        %% =========================================================
-        % WP1 TASK 1 - THRUST VS ISP
-        %% =========================================================
+if nargin < 1
+    task = input('WP1 - Choose Task 1 or 2: ');
+end
 
-        m0 = 115000;
-        dt = 0.1;
-        tEnd = 20;
+[g0,~,~,rho0,~] = constants();
 
-        % Engine 1 - original
-        T1 = 1.30e6;
-        Isp1 = 300;
+m0 = 115000;
+d = 3.5;
+A = pi*(d/2)^2;
+Cd = 0.20;
+H = 9500;
 
-        % Engine 2 - higher thrust
-        T2 = 1.55e6;
-        Isp2 = 300;
+switch task
 
-        % Engine 3 - higher Isp
-        T3 = 1.30e6;
-        Isp3 = 340;
+    case 1
+        %% TASK 1 - ORIGINAL / HIGHER THRUST / HIGHER ISP
 
-        % No drag study in this task
-        A = 1;
-        Cd = 0;
+        T = [1.30e6 1.55e6 1.30e6];
+        Isp = [300 300 340];
+        names = {'Original','Higher thrust','Higher Isp'};
 
-        original = simulate_vertical(m0,T1,Isp1,A,Cd,false,tEnd,dt);
-        highT    = simulate_vertical(m0,T2,Isp2,A,Cd,false,tEnd,dt);
-        highIsp  = simulate_vertical(m0,T3,Isp3,A,Cd,false,tEnd,dt);
+        for k = 1:3
+            out(k) = sim_vertical(m0,T(k),Isp(k),A,Cd,H,...
+                                  rho0,g0,false,20,0.1);
+        end
 
-        fprintf('INITIAL ACCELERATION\n')
-        fprintf('Original:      %.2f m/s^2\n',original.a(1))
-        fprintf('Higher thrust: %.2f m/s^2\n',highT.a(1))
-        fprintf('Higher Isp:    %.2f m/s^2\n\n',highIsp.a(1))
+        original = out(1);
+        higherThrust = out(2);
+        higherIsp = out(3);
 
-        fprintf('MASS FLOW RATE\n')
-        fprintf('Original:      %.2f kg/s\n',original.mdot)
-        fprintf('Higher thrust: %.2f kg/s\n',highT.mdot)
-        fprintf('Higher Isp:    %.2f kg/s\n',highIsp.mdot)
+        fprintf('\nINITIAL ACCELERATION\n')
+        fprintf('Original: %.2f m/s^2\n',original.a(1))
+        fprintf('Higher thrust: %.2f m/s^2\n',higherThrust.a(1))
+        fprintf('Higher Isp: %.2f m/s^2\n',higherIsp.a(1))
+
+        fprintf('\nMASS FLOW RATE\n')
+        fprintf('Original: %.2f kg/s\n',original.mdot)
+        fprintf('Higher thrust: %.2f kg/s\n',higherThrust.mdot)
+        fprintf('Higher Isp: %.2f kg/s\n',higherIsp.mdot)
+
+        fprintf('\nPROPELLANT USED AFTER %.0f s\n',original.t(end))
+        fprintf('Original: %.2f kg\n',original.prop(end))
+        fprintf('Higher thrust: %.2f kg\n',higherThrust.prop(end))
+        fprintf('Higher Isp: %.2f kg\n',higherIsp.prop(end))
+
+        fprintf('\nFINITE VALUES CHECK\n')
+        fprintf('Original: %d\n',all(isfinite(original.a)))
+        fprintf('Higher thrust: %d\n',all(isfinite(higherThrust.a)))
+        fprintf('Higher Isp: %d\n',all(isfinite(higherIsp.a)))
 
         figure
-        plot(original.t,original.a,'LineWidth',1.5); hold on
-        plot(highT.t,highT.a,'LineWidth',1.5)
-        plot(highIsp.t,highIsp.a,'LineWidth',1.5)
+        subplot(2,2,1)
+        for k = 1:3
+            plot(out(k).t,out(k).a,'LineWidth',1.5); hold on
+        end
         xlabel('Time [s]'); ylabel('Acceleration [m/s^2]')
-        legend('Original','Higher thrust','Higher Isp'); grid on
+        legend(names); grid on
 
-        figure
-        plot(original.t,original.v,'LineWidth',1.5); hold on
-        plot(highT.t,highT.v,'LineWidth',1.5)
-        plot(highIsp.t,highIsp.v,'LineWidth',1.5)
+        subplot(2,2,2)
+        for k = 1:3
+            plot(out(k).t,out(k).v,'LineWidth',1.5); hold on
+        end
         xlabel('Time [s]'); ylabel('Velocity [m/s]')
-        legend('Original','Higher thrust','Higher Isp'); grid on
+        legend(names); grid on
 
-        figure
-        plot(original.t,original.h,'LineWidth',1.5); hold on
-        plot(highT.t,highT.h,'LineWidth',1.5)
-        plot(highIsp.t,highIsp.h,'LineWidth',1.5)
+        subplot(2,2,3)
+        for k = 1:3
+            plot(out(k).t,out(k).h,'LineWidth',1.5); hold on
+        end
         xlabel('Time [s]'); ylabel('Altitude [m]')
-        legend('Original','Higher thrust','Higher Isp'); grid on
+        legend(names); grid on
 
-        figure
-        plot(original.t,original.propUsed,'LineWidth',1.5); hold on
-        plot(highT.t,highT.propUsed,'LineWidth',1.5)
-        plot(highIsp.t,highIsp.propUsed,'LineWidth',1.5)
+        subplot(2,2,4)
+        for k = 1:3
+            plot(out(k).t,out(k).prop,'LineWidth',1.5); hold on
+        end
         xlabel('Time [s]'); ylabel('Propellant used [kg]')
-        legend('Original','Higher thrust','Higher Isp'); grid on
+        legend(names); grid on
 
-        %% =========================================================
-        % WP1 TASK 2 - EFFECT OF AREA / DRAG
-        %% =========================================================
 
-        rho0 = 1.225;
-        H = 9500;
-        Cd = 0.20;
-
-        m0 = 115000;
-        diameter = 3.5;
-        A_original = pi*(diameter/2)^2;
-        A_higher = 50*A_original;
+    case 2
+        %% TASK 2 - AREA / ATMOSPHERE
 
         T = 1.30e6;
         Isp = 300;
+        A2 = 50*A;
 
-        dt = 0.1;
-        tEnd = 150;
-
-        % Same physical state comparison
+        % Same physical state check
         h_test = 1000;
         v_test = 100;
 
-        p1 = common_physics(h_test,v_test,T,Isp,Cd,A_original,rho0,H,9.81,true);
-        p2 = common_physics(h_test,v_test,T,Isp,Cd,A_higher,rho0,H,9.81,true);
+        [~,q_test,D_original] = atmosphere_drag(...
+            h_test,v_test,Cd,A,rho0,H,true);
 
-        fprintf('SAME PHYSICAL STATE COMPARISON\n')
-        fprintf('Dynamic pressure: %.2f Pa\n',p1.q)
-        fprintf('Original drag: %.2f N\n',p1.D)
-        fprintf('Higher drag: %.2f N\n\n',p2.D)
+        [~,~,D_higher] = atmosphere_drag(...
+            h_test,v_test,Cd,A2,rho0,H,true);
 
-        original = simulate_vertical(m0,T,Isp,A_original,Cd,true,tEnd,dt);
-        higher   = simulate_vertical(m0,T,Isp,A_higher,Cd,true,tEnd,dt);
-        noAtm    = simulate_vertical(m0,T,Isp,A_original,Cd,false,tEnd,dt);
+        fprintf('\nSAME PHYSICAL STATE\n')
+        fprintf('Altitude = %.0f m\n',h_test)
+        fprintf('Velocity = %.0f m/s\n',v_test)
+        fprintf('Dynamic pressure = %.2f Pa\n',q_test)
+        fprintf('Original drag = %.2f N\n',D_original)
+        fprintf('Higher-area drag = %.2f N\n',D_higher)
+        fprintf('Drag increase = %.2f %%\n',...
+            100*(D_higher-D_original)/D_original)
 
-        fprintf('FINAL RESULTS\n')
-        fprintf('Original area: h = %.2f m, v = %.2f m/s\n',original.h(end),original.v(end))
-        fprintf('Higher area:   h = %.2f m, v = %.2f m/s\n',higher.h(end),higher.v(end))
-        fprintf('No atmosphere: h = %.2f m, v = %.2f m/s\n',noAtm.h(end),noAtm.v(end))
+        original = sim_vertical(m0,T,Isp,A,Cd,H,...
+            rho0,g0,true,150,0.1);
 
-        figure
-        plot(original.t,original.a,'LineWidth',1.5); hold on
-        plot(higher.t,higher.a,'LineWidth',1.5)
-        plot(noAtm.t,noAtm.a,'LineWidth',1.5)
-        legend('Original area','Higher area','No atmosphere'); grid on
-        ylabel('Acceleration [m/s^2]'); xlabel('Time [s]')
+        higherA = sim_vertical(m0,T,Isp,A2,Cd,H,...
+            rho0,g0,true,150,0.1);
 
-        figure
-        plot(original.t,original.v,'LineWidth',1.5); hold on
-        plot(higher.t,higher.v,'LineWidth',1.5)
-        plot(noAtm.t,noAtm.v,'LineWidth',1.5)
-        legend('Original area','Higher area','No atmosphere'); grid on
-        ylabel('Velocity [m/s]'); xlabel('Time [s]')
+        vacuum = sim_vertical(m0,T,Isp,A,Cd,H,...
+            rho0,g0,false,150,0.1);
 
-        figure
-        plot(original.t,original.h,'LineWidth',1.5); hold on
-        plot(higher.t,higher.h,'LineWidth',1.5)
-        plot(noAtm.t,noAtm.h,'LineWidth',1.5)
-        legend('Original area','Higher area','No atmosphere'); grid on
-        ylabel('Altitude [m]'); xlabel('Time [s]')
+        fprintf('\nFINAL RESULTS\n')
+        fprintf('Original: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa\n',...
+            original.h(end),original.v(end),max(original.D),max(original.q))
+        fprintf('Higher A: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa\n',...
+            higherA.h(end),higherA.v(end),max(higherA.D),max(higherA.q))
+        fprintf('No atmosphere: h = %.1f m, V = %.1f m/s\n',...
+            vacuum.h(end),vacuum.v(end))
 
-        figure
-        plot(original.t,original.D,'LineWidth',1.5); hold on
-        plot(higher.t,higher.D,'LineWidth',1.5)
-        plot(noAtm.t,noAtm.D,'LineWidth',1.5)
-        legend('Original area','Higher area','No atmosphere'); grid on
-        ylabel('Drag [N]'); xlabel('Time [s]')
+        fprintf('\nEFFECT OF HIGHER AREA\n')
+        fprintf('Altitude difference = %.2f %%\n',...
+            100*(higherA.h(end)-original.h(end))/original.h(end))
+        fprintf('Velocity difference = %.2f %%\n',...
+            100*(higherA.v(end)-original.v(end))/original.v(end))
 
         figure
-        plot(original.t,original.q,'LineWidth',1.5); hold on
-        plot(higher.t,higher.q,'LineWidth',1.5)
-        plot(noAtm.t,noAtm.q,'LineWidth',1.5)
-        legend('Original area','Higher area','No atmosphere'); grid on
-        ylabel('Dynamic pressure [Pa]'); xlabel('Time [s]')
+        subplot(2,3,1)
+        plot(original.t,original.a,higherA.t,higherA.a,vacuum.t,vacuum.a,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Acceleration [m/s^2]'); grid on
 
- 
+        subplot(2,3,2)
+        plot(original.t,original.v,higherA.t,higherA.v,vacuum.t,vacuum.v,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Velocity [m/s]'); grid on
+
+        subplot(2,3,3)
+        plot(original.t,original.h,higherA.t,higherA.h,vacuum.t,vacuum.h,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Altitude [m]'); grid on
+
+        subplot(2,3,4)
+        plot(original.t,original.D,higherA.t,higherA.D,vacuum.t,vacuum.D,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Drag [N]'); grid on
+
+        subplot(2,3,5)
+        plot(original.t,original.q,higherA.t,higherA.q,vacuum.t,vacuum.q,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Dynamic pressure [Pa]'); grid on
+
+        subplot(2,3,6)
+        plot(original.t,original.prop,higherA.t,higherA.prop,vacuum.t,vacuum.prop,'LineWidth',1.3)
+        xlabel('Time [s]'); ylabel('Propellant used [kg]'); grid on
+
+        legend('Original area','Higher area','No atmosphere')
+
+    otherwise
+        disp('Choose Task 1 or Task 2')
+end
+
+end
+
+
+function out = sim_vertical(m0,T,Isp,A,Cd,H,rho0,g0,useAtmosphere,tEnd,dt)
+
+t = 0:dt:tEnd;
+N = length(t);
+
+m = zeros(1,N);
+a = zeros(1,N);
+v = zeros(1,N);
+h = zeros(1,N);
+q = zeros(1,N);
+D = zeros(1,N);
+
+m(1) = m0;
+mdot = mass_flow(T,Isp,g0);
+
+for i = 1:N-1
+
+    [~,q(i),D(i)] = atmosphere_drag(...
+        h(i),v(i),Cd,A,rho0,H,useAtmosphere);
+
+    a(i) = (T-m(i)*g0-D(i))/m(i);
+
+    % Forward Euler
+    v(i+1) = v(i)+a(i)*dt;
+    h(i+1) = h(i)+v(i)*dt;
+    m(i+1) = m(i)-mdot*dt;
+end
+
+[~,q(end),D(end)] = atmosphere_drag(...
+    h(end),v(end),Cd,A,rho0,H,useAtmosphere);
+
+a(end) = (T-m(end)*g0-D(end))/m(end);
+
+out.t = t;
+out.a = a;
+out.v = v;
+out.h = h;
+out.q = q;
+out.D = D;
+out.mdot = mdot;
+out.prop = m0-m;
+
 end
 
