@@ -1,0 +1,12 @@
+function [g0,mu,rE,rho0,rE_wp2] = constants()
+% Common physical constants
+
+g0 = 9.80665;
+mu = 3.986004418e14;
+rE = 6371e3;
+rho0 = 1.225;
+
+% Value used in the original WP2 Task 2 code
+rE_wp2 = 6374.2e3;
+
+end
