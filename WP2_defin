@@ -139,7 +139,7 @@ tb = 200;
 Isp = 280;
 S = 7;
 Cd = 0.3;
-H = 7500;
+H = 8500;
 
 mdot = (m0-mdry)/tb;
 Thrust = mdot*g0*Isp;
@@ -158,7 +158,7 @@ Q = zeros(1,N);
 Vt = zeros(1,N);
 
 V(1) = 0.1;
-gamma(1) = deg2rad(89.9);
+gamma(1) = deg2rad(90.0);
 m(1) = m0;
 
 last = N;
@@ -176,11 +176,11 @@ for i = 1:N-1
     end
 
     if ti < t_turn
-        ps = deg2rad(89.9);
+        ps = deg2rad(90.0);
     elseif ti < t_turn+80
-        ps = deg2rad(89.9)-deg2rad(65)*(ti-t_turn)/80;
+        ps = deg2rad(90.0)-deg2rad(90.0-25.0)*(ti-t_turn)/80; % empezamos en pitch inicial = 90º y llegamos a pitch final = 25º en un tiempo de giro de 80 segundos
     else
-        ps = deg2rad(24.9);
+        ps = deg2rad(25.0);
     end
 
     [~,Q(i),D] = atmosphere_drag(...
