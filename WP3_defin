@@ -230,7 +230,7 @@ end
 
 function out = sim_task1(twoStage,g0,mu,rE,rho0)
 
-H = 9500;
+H =8500;
 Cd = 0.5;
 Cl = 0.5;
 
@@ -358,7 +358,7 @@ A2 = 7;
 Cd2 = 0.30;
 
 payload = 4000;
-H = 7200;
+H = 8500;
 
 mdot1 = mass_flow(T1,Isp1,g0);
 mdot2 = mass_flow(T2,Isp2,g0);
