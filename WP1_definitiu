@@ -26,7 +26,7 @@ switch task
 
         for k = 1:3
             out(k) = sim_vertical(m0,T(k),Isp(k),A,Cd,H,...
-                                  rho0,g0,false,20,0.1);
+                                  rho0,g0,true,20,0.1);
         end
 
         original = out(1);
