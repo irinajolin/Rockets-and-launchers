@@ -7,64 +7,73 @@ if nargin < 1
     task = input('WP2 - Choose Task 1 or 2: ');
 end
 
-[g0,mu,rE,rho0,rE_wp2] = constants();
+[g0,mu,rE,rho0] = constants(); % usamos todas las constantes
 
 switch task
 
     case 1
         %% TASK 1 - EARLY / BASELINE / LATE + SLIDER
 
-        early = sim_pitch(10,g0,rE,rho0);
+        early = sim_pitch(10,g0,rE,rho0); 
         baseline = sim_pitch(20,g0,rE,rho0);
         late = sim_pitch(40,g0,rE,rho0);
 
-        Turn = [10;20;40];
-        hCut_km = [early.hCut;baseline.hCut;late.hCut]/1000;
-        VCut = [early.VCut;baseline.VCut;late.VCut];
-        VtCut = [early.VtCut;baseline.VtCut;late.VtCut];
-        Qmax_kPa = [early.Qmax;baseline.Qmax;late.Qmax]/1000;
+        Turn = [10;20;40]; % los pitch que queremos probar 
+        hCut_km = [early.hCut;baseline.hCut;late.hCut]/1000; % recoge para cada vuelo la altitude al cutoff
+        VCut = [early.VCut;baseline.VCut;late.VCut];  % recoge para cada vuelo la total speed al cutoff
+        VtCut = [early.VtCut;baseline.VtCut;late.VtCut]; % transverse speed al cutoff
+        Qmax_kPa = [early.Qmax;baseline.Qmax;late.Qmax]/1000; % maximum dynamic pressure 
 
-        CutoffTable = table(Turn,hCut_km,VCut,VtCut,Qmax_kPa);
-        disp(CutoffTable)
+        CutoffTable = table(Turn,hCut_km,VCut,VtCut,Qmax_kPa); % creamos la tabla comparativa, con todos estos valores
+        disp(CutoffTable) % enseñamos la tabla en command window 
 
         figure
-        subplot(1,2,1)
+        subplot(2,2,1) % plot de trayectorias , eje x downrange, eje y altitude 
         plot(early.x/1000,early.h/1000,'LineWidth',1.5); hold on
         plot(baseline.x/1000,baseline.h/1000,'LineWidth',1.5)
         plot(late.x/1000,late.h/1000,'LineWidth',1.5)
         xlabel('Downrange [km]'); ylabel('Altitude [km]')
-        legend('Early','Baseline','Late'); grid on
+        legend('Early','Baseline','Late'); 
+        grid on
 
-        subplot(1,2,2)
-        plot(early.t,early.Q/1000,'LineWidth',1.5); hold on
+        subplot(2,2,2) 
+        plot(early.t,early.Q/1000,'LineWidth',1.5); 
+        hold on
         plot(baseline.t,baseline.Q/1000,'LineWidth',1.5)
         plot(late.t,late.Q/1000,'LineWidth',1.5)
         xlabel('Time [s]'); ylabel('Q [kPa]')
-        legend('Early','Baseline','Late'); grid on
+        legend('Early','Baseline','Late'); 
+        grid on
 
-        % Interactive slider
-        fig = uifigure('Name','WP2 Task 1','Position',[100 100 1100 700]);
+        subplot(2,2,3)
+        plot(early.t,rad2deg(early.psi),'LineWidth',1.5)
+        hold on
 
-        slider = uislider(fig,'Position',[220 50 600 3],...
-            'Limits',[5 60],'Value',20);
+        plot(baseline.t,rad2deg(baseline.psi),'LineWidth',1.5)
 
-        label = uilabel(fig,'Position',[840 40 130 22]);
+        plot(late.t,rad2deg(late.psi),'LineWidth',1.5)
+        xlabel('Time [s]')
+        ylabel('Pitch [deg]')
+        title('Body-axis pitch')
+        legend('Early','Baseline','Late')
+        grid on
 
-        ax1 = uiaxes(fig,'Position',[60 390 450 230]);
-        ax2 = uiaxes(fig,'Position',[580 390 450 230]);
-        ax3 = uiaxes(fig,'Position',[60 120 450 230]);
-        ax4 = uiaxes(fig,'Position',[580 120 450 230]);
 
-        slider.ValueChangedFcn = @(src,event) updatePlots(...
-            src.Value,label,ax1,ax2,ax3,ax4,g0,rE,rho0);
-
-        updatePlots(slider.Value,label,ax1,ax2,ax3,ax4,g0,rE,rho0);
+        % 4. FLIGHT-PATH ANGLE
+        subplot(2,2,4)
+        plot(early.t,rad2deg(early.gamma),'LineWidth',1.5)
+        hold on
+        plot(baseline.t,rad2deg(baseline.gamma),'LineWidth',1.5)
+        plot(late.t,rad2deg(late.gamma),'LineWidth',1.5)
+        xlabel('Time [s]')
+        ylabel('Flight-path angle [deg]')
+        title('Flight-path angle')
+        legend('Early','Baseline','Late')
+        grid on
 
 
     case 2
         %% TASK 2 - INSERTION CLAIM
-
-        rE = rE_wp2;
         hTarget = 300e3;
         r0 = rE+hTarget;
         Vc = sqrt(mu/r0);
@@ -120,38 +129,6 @@ switch task
 end
 
 end
-
-
-function updatePlots(t_turn,label,ax1,ax2,ax3,ax4,g0,rE,rho0)
-
-data = sim_pitch(t_turn,g0,rE,rho0);
-label.Text = sprintf('t_{turn} = %.1f s',t_turn);
-
-cla(ax1); cla(ax2); cla(ax3); cla(ax4)
-
-plot(ax1,data.x/1000,data.h/1000,'LineWidth',1.5)
-xlabel(ax1,'Downrange [km]')
-ylabel(ax1,'Altitude [km]')
-grid(ax1,'on')
-
-plot(ax2,data.t,data.Q/1000,'LineWidth',1.5)
-xlabel(ax2,'Time [s]')
-ylabel(ax2,'Q [kPa]')
-grid(ax2,'on')
-
-plot(ax3,data.t,rad2deg(data.psi),'--','LineWidth',1.5)
-hold(ax3,'on')
-plot(ax3,data.t,rad2deg(data.gamma),'LineWidth',1.5)
-legend(ax3,'Pitch','Flight path')
-grid(ax3,'on')
-
-plot(ax4,data.t,data.Vt,'LineWidth',1.5)
-xlabel(ax4,'Time [s]')
-ylabel(ax4,'V_t [m/s]')
-grid(ax4,'on')
-
-end
-
 
 function sim = sim_pitch(t_turn,g0,rE,rho0)
 
@@ -314,3 +291,4 @@ energy = 0.5*V2-mu./r;
 hMomentum = x.*vy-y.*vx;
 
 end
+
