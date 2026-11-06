@@ -1,0 +1,14 @@
+function [ve] = exit_velocity(Ro, M, Tc, gamma, pc, pe)
+% Nina Cid 
+% Exit velocity function from 1-Rockets-Ideal rocket engine.key page 47
+% Inputs:
+% Ro universal constant 
+% M molecular mass (kg/mol) 
+% Tc chamber temperature (K)
+% gamma 
+% pc
+% pe 
+
+ve = sqrt(((2*gamma*Ro*Tc)/((gamma-1)*M))*(1-(pe/pc)^((gamma-1)/gamma)));
+
+end
