@@ -1,4 +1,4 @@
-function[Cstar] = cee_star(R0,molar,T,gamma)
+function[Rs,Cstar] = cee_star(R0,molar,T,gamma)
 % Compute the dimensionless critical energy-exchange coefficient
 % R0: universal gas constant
 % molar: Molar mass
