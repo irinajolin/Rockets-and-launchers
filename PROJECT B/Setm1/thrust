@@ -1,0 +1,13 @@
+function [T] = thrust(mdot, Ve, Ae, Pe, Pa)
+%Nina Cid
+%Exit velocity function from 1-Rockets-Ideal rocket engine.key page 47
+% Inputs:
+% Ae exit area
+% Pa atmospheric pressure
+% Pe exit pressure
+% Ve exit velocity
+% mdot
+
+
+T = mdot*Ve + Ae(Pe-Pa);
+end
