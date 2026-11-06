@@ -1,9 +1,11 @@
 R0 universal constant = 8.3144626185324 % Universal gas constant (J/molK)
-M molecular mass (kg/mol) 
-Tc chamber temperature (K)
+M = molecular mass (kg/mol) 
+Tc = chamber temperature (K)
 gamma 
 Pc chamber pressure 
-Pe exit pressure 
-Ae exit area
-mdot mdot :)
-Ve exit velocity
+Pe = exit pressure 
+Ae = exit area
+mdot = mdot :)
+Ve = exit velocity
+g0 = g estándar = 9.80665 m/s^2 
+T = thrust
