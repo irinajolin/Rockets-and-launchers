@@ -1,4 +1,4 @@
-function WP1(task)
+function WP1_final(task)
 % WP1 - Task 1 and Task 2
 
 clc; close all;
@@ -7,26 +7,25 @@ if nargin < 1
     task = input('WP1 - Choose Task 1 or 2: ');
 end
 
-[g0,~,~,rho0,~] = constants();
+[g0,~,~,rho0,~] = constants(); % only recover the constants we need fot these tasks
 
-m0 = 115000;
-d = 3.5;
-A = pi*(d/2)^2;
-Cd = 0.20;
-H = 8500;
+m0 = 115000; % initial mass
+d = 3.5;    % diameter of the launcher
+A = pi*(d/2)^2; % cross section area
+Cd = 0.20;  % drag coefficient
+H = 8500;   % parameter used for computing variable atmospheric density
 
 switch task
 
     case 1
         %% TASK 1 - ORIGINAL / HIGHER THRUST / HIGHER ISP
 
-        T = [1.30e6 1.55e6 1.30e6];
-        Isp = [300 300 340];
+        T = [1.30e6 1.55e6 1.30e6]; % different thrusts [original, higher, lower]
+        Isp = [300 300 340]; % different specific impulse [original, original, higher]
         names = {'Original','Higher thrust','Higher Isp'};
 
         for k = 1:3
-            out(k) = sim_vertical(m0,T(k),Isp(k),A,Cd,H,...
-                                  rho0,g0,true,20,0.1);
+            out(k) = sim_vertical(m0,T(k),Isp(k),A,Cd,H,rho0,g0,true,20,0.1); % uses sim_vertical function (line 157)
         end
 
         original = out(1);
@@ -59,6 +58,7 @@ switch task
             plot(out(k).t,out(k).a,'LineWidth',1.5); hold on
         end
         xlabel('Time [s]'); ylabel('Acceleration [m/s^2]')
+        title('Acceleration during initial ascent');
         legend(names); grid on
 
         subplot(2,2,2)
@@ -66,6 +66,7 @@ switch task
             plot(out(k).t,out(k).v,'LineWidth',1.5); hold on
         end
         xlabel('Time [s]'); ylabel('Velocity [m/s]')
+        title('Velocity during initial ascent');
         legend(names); grid on
 
         subplot(2,2,3)
@@ -73,6 +74,7 @@ switch task
             plot(out(k).t,out(k).h,'LineWidth',1.5); hold on
         end
         xlabel('Time [s]'); ylabel('Altitude [m]')
+        title('Altitude during initial ascent');
         legend(names); grid on
 
         subplot(2,2,4)
@@ -80,6 +82,7 @@ switch task
             plot(out(k).t,out(k).prop,'LineWidth',1.5); hold on
         end
         xlabel('Time [s]'); ylabel('Propellant used [kg]')
+        title('Propellant consumption');
         legend(names); grid on
 
 
@@ -88,17 +91,20 @@ switch task
 
         T = 1.30e6;
         Isp = 300;
-        A2 = 50*A;
+        A2 = 1.5*A; % increase area by a factor 50
+        % what we should see: more area, more drag (FD = 0.5*rho*A*Cd*v^2) 
 
         % Same physical state check
         h_test = 1000;
         v_test = 100;
 
-        [~,q_test,D_original] = atmosphere_drag(...
-            h_test,v_test,Cd,A,rho0,H,true);
+        [~,q_test,D_original] = atmosphere_drag(h_test,v_test,Cd,A,rho0,H,true);
+        % we use the function atmosphere_drag to calculate the dynamic
+        % pressure and the drag force
 
-        [~,~,D_higher] = atmosphere_drag(...
-            h_test,v_test,Cd,A2,rho0,H,true);
+        [~,~,D_higher] = atmosphere_drag(h_test,v_test,Cd,A2,rho0,H,true);
+        % as q does not depend on A and we haven't change anything else, q
+        % is the same and the only returned value that changes is D
 
         fprintf('\nSAME PHYSICAL STATE\n')
         fprintf('Altitude = %.0f m\n',h_test)
@@ -106,56 +112,39 @@ switch task
         fprintf('Dynamic pressure = %.2f Pa\n',q_test)
         fprintf('Original drag = %.2f N\n',D_original)
         fprintf('Higher-area drag = %.2f N\n',D_higher)
-        fprintf('Drag increase = %.2f %%\n',...
-            100*(D_higher-D_original)/D_original)
+        fprintf('Drag increase = %.2f %%\n',100*(D_higher-D_original)/D_original)
 
-        original = sim_vertical(m0,T,Isp,A,Cd,H,...
-            rho0,g0,true,150,0.1);
+        original = sim_vertical(m0,T,Isp,A,Cd,H,rho0,g0,true,150,0.1); % specified values
 
-        higherA = sim_vertical(m0,T,Isp,A2,Cd,H,...
-            rho0,g0,true,150,0.1);
+        higherA = sim_vertical(m0,T,Isp,A2,Cd,H,rho0,g0,true,150,0.1); % larger area
 
-        vacuum = sim_vertical(m0,T,Isp,A,Cd,H,...
-            rho0,g0,false,150,0.1);
+        vacuum = sim_vertical(m0,T,Isp,A,Cd,H,rho0,g0,false,150,0.1); % no atmosphere with original area -> D = 0
 
         fprintf('\nFINAL RESULTS\n')
-        fprintf('Original: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa\n',...
-            original.h(end),original.v(end),max(original.D),max(original.q))
-        fprintf('Higher A: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa\n',...
-            higherA.h(end),higherA.v(end),max(higherA.D),max(higherA.q))
-        fprintf('No atmosphere: h = %.1f m, V = %.1f m/s\n',...
-            vacuum.h(end),vacuum.v(end))
+        fprintf('Original: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa, Propellant used = %.1f kg\n',original.h(end),original.v(end),max(original.D),max(original.q),original.prop(end))
+        fprintf('Higher A: h = %.1f m, V = %.1f m/s, Dmax = %.1f N, Qmax = %.1f Pa, Propellant used = %.1f kg\n',higherA.h(end),higherA.v(end),max(higherA.D),max(higherA.q),higherA.prop(end))
+        fprintf('No atmosphere: h = %.1f m, V = %.1f m/s, Propellant used = %.1f kg\n',vacuum.h(end),vacuum.v(end),vacuum.prop(end))
 
         fprintf('\nEFFECT OF HIGHER AREA\n')
-        fprintf('Altitude difference = %.2f %%\n',...
-            100*(higherA.h(end)-original.h(end))/original.h(end))
-        fprintf('Velocity difference = %.2f %%\n',...
-            100*(higherA.v(end)-original.v(end))/original.v(end))
+        fprintf('Altitude difference = %.2f %%\n',100*(higherA.h(end)-original.h(end))/original.h(end))
+        fprintf('Velocity difference = %.2f %%\n',100*(higherA.v(end)-original.v(end))/original.v(end))
 
         figure
-        subplot(2,3,1)
+        subplot(2,2,1)
         plot(original.t,original.a,higherA.t,higherA.a,vacuum.t,vacuum.a,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Acceleration [m/s^2]'); grid on
+        xlabel('Time [s]'); ylabel('Acceleration [m/s^2]'); title('Acceleration'); grid on
 
-        subplot(2,3,2)
-        plot(original.t,original.v,higherA.t,higherA.v,vacuum.t,vacuum.v,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Velocity [m/s]'); grid on
-
-        subplot(2,3,3)
-        plot(original.t,original.h,higherA.t,higherA.h,vacuum.t,vacuum.h,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Altitude [m]'); grid on
-
-        subplot(2,3,4)
+        subplot(2,2,2)
         plot(original.t,original.D,higherA.t,higherA.D,vacuum.t,vacuum.D,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Drag [N]'); grid on
+        xlabel('Time [s]'); ylabel('Drag [N]'); title ('Drag force'); grid on
 
-        subplot(2,3,5)
+        subplot(2,2,3)
         plot(original.t,original.q,higherA.t,higherA.q,vacuum.t,vacuum.q,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Dynamic pressure [Pa]'); grid on
+        xlabel('Time [s]'); ylabel('Dynamic pressure [Pa]'); title('Dynamic pressure'); grid on
 
-        subplot(2,3,6)
+        subplot(2,2,4)
         plot(original.t,original.prop,higherA.t,higherA.prop,vacuum.t,vacuum.prop,'LineWidth',1.3)
-        xlabel('Time [s]'); ylabel('Propellant used [kg]'); grid on
+        xlabel('Time [s]'); ylabel('Propellant used [kg]'); title('Propellant consumption'); grid on
 
         legend('Original area','Higher area','No atmosphere')
 
@@ -167,6 +156,11 @@ end
 
 
 function out = sim_vertical(m0,T,Isp,A,Cd,H,rho0,g0,useAtmosphere,tEnd,dt)
+% m0: initial mass; T: thrust (1, 2, 3); Isp: specific impulse (1, 2, 3)
+% A: area calculated; Cd: drag coefficient; H: atmospheric scale height
+% (8500 km for Earth); rho0: initial density; g0: gravity force;
+% useAtmosphere: true/false (vacuum); tEnd: burn time, time of the ascend;
+% dt: time step used for Forward Euler
 
 t = 0:dt:tEnd;
 N = length(t);
@@ -179,12 +173,13 @@ q = zeros(1,N);
 D = zeros(1,N);
 
 m(1) = m0;
-mdot = mass_flow(T,Isp,g0);
+mdot = mass_flow(T,Isp,g0); % function mass_flow: calculates mdot = T/Isp*g0
 
-for i = 1:N-1
-
-    [~,q(i),D(i)] = atmosphere_drag(...
-        h(i),v(i),Cd,A,rho0,H,useAtmosphere);
+for i = 1:N-1 % there is only N-1 intervals from 1 to N, 
+    % Forward Euler integrates between temporal points. not on specific points
+    % we calculate v(i+1), if i goes from 1 to N, we would calculate v(N+1)
+    % -> impossible
+    [~,q(i),D(i)] = atmosphere_drag(h(i),v(i),Cd,A,rho0,H,useAtmosphere);
 
     a(i) = (T-m(i)*g0-D(i))/m(i);
 
@@ -194,10 +189,10 @@ for i = 1:N-1
     m(i+1) = m(i)-mdot*dt;
 end
 
-[~,q(end),D(end)] = atmosphere_drag(...
-    h(end),v(end),Cd,A,rho0,H,useAtmosphere);
+[~,q(end),D(end)] = atmosphere_drag(h(end),v(end),Cd,A,rho0,H,useAtmosphere);
 
-a(end) = (T-m(end)*g0-D(end))/m(end);
+% here we calculate the final value in N
+a(end) = (T-m(end)*g0-D(end))/m(end); % M*a = T - Mg - D (don't take into account angles)
 
 out.t = t;
 out.a = a;
@@ -206,7 +201,7 @@ out.h = h;
 out.q = q;
 out.D = D;
 out.mdot = mdot;
-out.prop = m0-m;
+out.prop = m0-m; % as none of the parameters used for calculating mdot changes,
+% the amount of propellant used is constant
 
 end
-
