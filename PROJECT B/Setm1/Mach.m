@@ -1,10 +1,27 @@
-% Rockets and Launchers. Part B 
+% Rockets and Launchers. Part B
 % 05/11/2026
-function [a,M]= Mach(gamma,Rs,T,v)
+
+function [a,M,v] = Mach(gamma,Rs,T,v,M)
+
 % gamma: adiabatic coefficient
-% R0: universal gas constant
-% T: temperature (in Kelvin)
-% Calculate the speed of sound and corresponding Mach number
-% v: exhaust velocity
-a = sqrt(gamma * Rs * T);
-M = v/a;
+% Rs: specific gas constant [J/(kg*K)]
+% T: local temperature [K]
+% v: gas velocity [m/s]
+% M: Mach number
+
+% Speed of sound
+a = sqrt(gamma .* Rs .* T);
+
+if isempty(M) && ~isempty(v)
+    % Tenim velocitat i calculem Mach
+    M = v ./ a;
+
+elseif isempty(v) && ~isempty(M)
+    % Tenim Mach i calculem velocitat
+    v = M .* a;
+
+else
+    error('Introdueix M o v com a incognita utilitzant [].');
+end
+
+end
