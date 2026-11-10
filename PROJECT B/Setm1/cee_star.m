@@ -5,6 +5,6 @@ function[Rs,Cstar] = cee_star(R0,molar,T,gamma)
 % T: temperature of the chamber (in Kelvin)
 % gamma: adiabatic coefficient
 Rs = R0/molar; % specific gas constant [m/s] 
-gamma_big = sqrt(gamma) .* (2/(gamma + 1))^((gamma + 1)/2*(gamma - 1));
+gamma_big = sqrt(gamma) .* (2/(gamma + 1))^((gamma + 1)/(2*(gamma - 1)));
 Cstar = sqrt(Rs .* T) ./ (gamma_big);
 end
