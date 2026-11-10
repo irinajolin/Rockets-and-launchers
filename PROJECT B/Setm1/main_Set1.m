@@ -108,7 +108,7 @@ ylabel('Gas velocity [m/s]');
 title('Gas velocity along nozzle');
 grid on;
 xline(1,'--','Throat');
-%Mass flow vs mach
+
 subplot(3,2,6);
 plot(M_vec,mdot_vec);
 xlabel('Mach number');
@@ -131,3 +131,86 @@ fprintf('Maximum relative error = %.3e\n', error_rel);
 % Results
 fprintf('\n--- THRUST AT LAUNCH ---\n');
 fprintf('Total thrust = %.2f kN\n',T/1000);
+
+
+
+%PROBLEM 2
+%mantenemos todos los parametros excepto epsilon
+
+% APARTADO A
+%plot in function of epsilon, both terms of the thrust(momentum thrust, pressure thrust) , the total thrust,
+%exit pressure , reasonable range of area expansion ratios 
+% queremos probar diferentes toberas que tienen la misma garganta pero
+% distintas areas de salida 
+epsilon_vec =linspace(1.05,25,200); % empezamos un poco x encima de 1 para evitar el punto de la garganta 
+% calculamos primero la presion en exit 
+Pe_vec = zeros(size(epsilon_vec));
+% calculem el ratio pe/pc per cada epsilon 
+for i= 1:length (epsilon_vec)
+    [~, Pr_sup, ~]= area_ratio_press(epsilon_vec(i),[],[],gamma);% a la salida tenemos flujo supersonico
+    Pe_vec(i)= Pr_sup*Pc; % pression de salida 
+end
+% calculamos la velocidad de salida 
+[ve_vec,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_vec);
+% calculamos el area de salida
+Ae_vec = epsilon_vec.*At;
+[T2_vec, T2_momentum_vec,T2_pressure_vec]=thrust(mass_flow,ve_vec,Ae_vec,Pe_vec,Pa);
+
+
+% APARTADO B --> marcar en el total thrust point (adapted nozzle,
+% summerfield point i schmucker point
+% adapted nozzle Pe=Pa --> cual es el epsilon para el cual la tobera esta
+% adapted nozzle 
+Pr_ad=Pc/Pa;
+[~,Me_ad]=pressure_ratio([],Pr_ad,gamma);% encontramos el mach para el que se cumple esto
+[epsilon_ad,~]=area_ratio([],Me_ad,gamma);
+fprintf('Adapted nozzle epsilon = %.4f\n',epsilon_ad);
+% criterio summerfield Pe/Pa= 0.4
+Pe_sum=ratio_summerfield([],Pa);
+Pr_sum=Pc/Pe_sum;
+[~,Me_sum]=pressure_ratio([],Pr_sum,gamma);
+[epsilon_sum,~]=area_ratio([],Me_sum,gamma);
+fprintf('Summerfield epsilon = %.4f\n',epsilon_sum);
+
+%criterio schmucker 
+
+[~,Me_sch_vec]=pressure_ratio([],Pc./Pe_vec,gamma); % un mach correspondiente para cada epsilon
+[Pr_sch_vec,~] = schmucker([],Me_sch_vec); % Pe/Pa
+Pr_actual_vec = Pe_vec ./ Pa;
+% queremos encontar donde Pr(actual)=Pr(sch)
+[~,idx_sch] = min(abs(Pr_actual_vec-Pr_sch_vec));
+
+% Epsilon corresponent
+epsilon_sch = epsilon_vec(idx_sch);
+
+fprintf('Schmucker epsilon = %.4f\n',epsilon_sch);
+
+%GRAFICOS 
+
+figure;
+
+% THRUST VS EPSILON
+subplot(1,2,1);
+
+plot(epsilon_vec,T2_momentum_vec/1000);
+hold on;
+plot(epsilon_vec,T2_pressure_vec/1000);
+plot(epsilon_vec,T2_vec/1000);
+xline(epsilon_ad,'--k','Adapted nozzle'); % añadimos lo que tenemos al final de adapted nozzle
+xline(epsilon_sum,'--r','Summerfield');% añadimos summerfield
+xline(epsilon_sch,'--','Schmucker'); % schmucker
+xlabel('Expansion ratio epsilon');
+ylabel('Thrust [kN]');
+title('Thrust vs expansion ratio');
+legend('Momentum thrust','Pressure thrust','Total thrust');
+grid on;
+
+% EXIT PRESSURE VS EPSILON
+subplot(1,2,2);
+
+plot(epsilon_vec,Pe_vec/1e5);
+
+xlabel('Expansion ratio epsilon');
+ylabel('Exit pressure [bar]');
+title('Exit pressure vs expansion ratio');
+grid on;
