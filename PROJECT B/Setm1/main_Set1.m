@@ -108,7 +108,7 @@ ylabel('Gas velocity [m/s]');
 title('Gas velocity along nozzle');
 grid on;
 xline(1,'--','Throat');
-
+%Mass flow vs mach
 subplot(3,2,6);
 plot(M_vec,mdot_vec);
 xlabel('Mach number');
