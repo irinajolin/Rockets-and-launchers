@@ -40,7 +40,7 @@ Ar=epsilon;% en este caso es igual a epsilon porque queremos en Mexit
 Me=M;
 fprintf('Exit Mach = %.6f\n', Me);
 
-% apartado d (plot as a function od the Match nº along the nozzle , P, T,
+% apartado d (plot as a function of the Match nº along the nozzle , P, T,
 % Density, An, Velocity gas, flow rate, 
 % creamos vector con los valores de Match
 M_vec = linspace (0.1,M,200);
@@ -126,8 +126,31 @@ fprintf('Maximum relative error = %.3e\n', error_rel);
 
 % APARTADO F 
 %thrust cuando el cohete esta en lanzamiento , ( a presion atmosferica) 
-[Ve,~] = exit_velocity([],[],R0,molar, Tc, gamma, Pc, Pe);
-[T, ~, ~]= thrust(mass_flow,Ve,Ae,Pe,Pa);
+[ve,~] = exit_velocity([],R0,molar, Tc, gamma, Pc, Pe);
+[T, ~, ~]= thrust(mass_flow,ve,Ae,Pe,Pa);
 % Results
 fprintf('\n--- THRUST AT LAUNCH ---\n');
 fprintf('Total thrust = %.2f kN\n',T/1000);
+
+
+%PROBLEM 2
+%mantenemos todos los parametros excepto epsilon
+
+% APARTADO A
+%plot as a function of epsilon, both terms of the thrust(momentum thrust, pressure thrust) , the total thrust,
+%exit pressure , reasonable range of area expansion ratios 
+% queremos probar diferentes toberas que tienen la misma garganta pero
+% distintas areas de salida 
+epsilon_vec =linspace(1.05,25,200); % empezamos un poco x encima de 1 para evitar el punto de la garganta 
+% calculamos primero la presion en exit 
+Pe_vec = zeros(size(epsilon_vec));
+% calculem el ratio pe/pc per cada epsilon 
+for i= 1:length (epsilon_vec)
+    [~, Pr_sup, ~]= area_ratio_press(epsilon_vec(i),[],[],gamma);% a la salida tenemos flujo supersonico
+    Pe_vec(i)= Pr_sup*Pc; % pression de salida 
+end
+% calculamos la velocidad de salida 
+[ve_vec,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_vec);
+% calculamos el area de salida
+Ae_vec = epsilon_vec.*At;
+[T2_vec, T2_momentum_vec,T2_pressure_vec]=thrust(mass_flow,ve_vec,Ae_vec,Pe_vec,

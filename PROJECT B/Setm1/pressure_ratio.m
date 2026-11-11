@@ -1,7 +1,7 @@
 function [Pr,M]= pressure_ratio (M, Pr,gamma)
 if isempty(Pr) && ~isempty(M)
     %tenim Match i calculem ratio de presions 
-    Pr= (1 +((gamma-1)/2).*M^2).^((gamma)/(gamma-1));
+    Pr= (1 +((gamma-1)/2).*M.^2).^((gamma)/(gamma-1));
 elseif isempty(M) && ~isempty(Pr)
     % tenim ratio de presions i calculem  match
     M = sqrt((2/(gamma-1)) .* (Pr.^((gamma-1)/gamma) - 1));
