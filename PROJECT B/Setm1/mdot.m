@@ -16,7 +16,6 @@ elseif ~isempty(rho) && ~isempty(A) && ~isempty(v)
     % Mass flow using mass conservation
     mass_flow = rho .* A .* v;
 
-
 end
 
 end
