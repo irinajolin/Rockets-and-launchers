@@ -144,20 +144,61 @@ fprintf('Total thrust = %.2f kN\n',T/1000);
 epsilon_vec =linspace(1.05,25,200); % empezamos un poco x encima de 1 para evitar el punto de la garganta 
 % calculamos primero la presion en exit 
 Pe_vec = zeros(size(epsilon_vec));
+% creamos un vector de Machs de salida para cada epsilon
+Me_vec = zeros(size(epsilon_vec));
+% creamos un vector de presiones de schmucker para cada exit mach
+Pr_sch_vec = zeros(size(epsilon_vec));
+adapted = 0;
 % calculem el ratio pe/pc per cada epsilon 
 for i= 1:length (epsilon_vec)
-    [~, Pr_sup, ~]= area_ratio_press(epsilon_vec(i),[],[],gamma);% a la salida tenemos flujo supersonico
+    [~, Pr_sup, ~] = area_ratio_press(epsilon_vec(i),[],[],gamma);% a la salida tenemos flujo supersonico
     Pe_vec(i)= Pr_sup*Pc; % pression de salida 
+    % calculamos mach_exit para cada epsilon
+    [~,M_vec] = area_ratio(epsilon_vec(i),[],gamma);
+    Me_vec(i)=M_vec;
+    % calculamos presión de schmucker para cada exit mach
+    [Pr_sch_vec,~] = schmucker([],Me_vec(i));
+    % encontramos los puntos de adapted nozzle, summerfield y schmucker
+    if abs(Pe_vec(i)-Pa) < 1000
+        Pe_adapted = Pe_vec(i);
+        adapted = epsilon_vec(i);
+        [ve_adapted,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_adapted);
+    elseif abs(Pe_vec(i)-0.4*Pa) < 1000
+        Pe_sf = Pe_vec(i);
+        summerfield = epsilon_vec(i);
+        [ve_sf,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_sf);
+    elseif abs(Pe_vec(i) - Pa*Pr_sch_vec) < 1000
+        Pe_sch = Pe_vec(i);
+        schmucker_point = epsilon_vec(i);
+        [ve_sch,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_sch);    
+    end
 end
 % calculamos la velocidad de salida 
 [ve_vec,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_vec);
 % calculamos el area de salida
 Ae_vec = epsilon_vec.*At;
 [T2_vec, T2_momentum_vec,T2_pressure_vec]=thrust(mass_flow,ve_vec,Ae_vec,Pe_vec, Pa);
+[T2_adapted,~,~] = thrust(mass_flow,ve_adapted,adapted*At,Pe_adapted, Pa);
+[T2_sf,~,~] = thrust(mass_flow,ve_sf,summerfield*At,Pe_sf, Pa);
+[T2_sch,~,~] = thrust(mass_flow,ve_sch,schmucker_point*At,Pe_sch, Pa);
+
 % Graficamos los términos del empuje y la presión de salida
 figure;
 subplot(2,1,1);
 plot(epsilon_vec,T2_momentum_vec/1000,epsilon_vec,T2_pressure_vec/1000,epsilon_vec,T2_vec/1000,'LineWidth',1.2);
 xlabel('\epsilon'); ylabel('Thrust [kN]');
-legend('Momentum','Pressure','Total','Location','best');
+grid on;
+hold on
+%plot(schmucker,'Schmucker point','hexagram');
+%plot(epsilon_vec, summerfield,'Summerfield point','hexagram');
+plot(adapted, T2_adapted/1000,'p','MarkerFaceColor','m','MarkerEdgeColor','auto');
+plot(summerfield, T2_sf/1000,'o','MarkerFaceColor','g');
+plot(schmucker_point, T2_sch/1000,'s','MarkerFaceColor','b','MarkerEdgeColor','auto');
+legend('Momentum','Pressure','Total','Adapted point','Summerfield point','Schmucker point');
+hold off
+
+subplot(2,1,2);
+plot(epsilon_vec,Pe_vec/1e5,'LineWidth',1.2);
+xlabel('\epsilon'); ylabel('Exit pressure [bar]');
+title('Exit pressure versus expansion ratio');
 grid on;
