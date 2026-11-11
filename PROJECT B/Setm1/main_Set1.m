@@ -126,7 +126,7 @@ fprintf('Maximum relative error = %.3e\n', error_rel);
 
 % APARTADO F 
 %thrust cuando el cohete esta en lanzamiento , ( a presion atmosferica) 
-[ve,~] = exit_velocity([],R0,molar, Tc, gamma, Pc, Pe);
+[ve,~] = exit_velocity([],[],R0,molar, Tc, gamma, Pc, Pe);
 [T, ~, ~]= thrust(mass_flow,ve,Ae,Pe,Pa);
 % Results
 fprintf('\n--- THRUST AT LAUNCH ---\n');
@@ -153,4 +153,11 @@ end
 [ve_vec,~]= exit_velocity([],[],R0, molar,Tc,gamma,Pc,Pe_vec);
 % calculamos el area de salida
 Ae_vec = epsilon_vec.*At;
-[T2_vec, T2_momentum_vec,T2_pressure_vec]=thrust(mass_flow,ve_vec,Ae_vec,Pe_vec,
+[T2_vec, T2_momentum_vec,T2_pressure_vec]=thrust(mass_flow,ve_vec,Ae_vec,Pe_vec, Pa);
+% Graficamos los términos del empuje y la presión de salida
+figure;
+subplot(2,1,1);
+plot(epsilon_vec,T2_momentum_vec/1000,epsilon_vec,T2_pressure_vec/1000,epsilon_vec,T2_vec/1000,'LineWidth',1.2);
+xlabel('\epsilon'); ylabel('Thrust [kN]');
+legend('Momentum','Pressure','Total','Location','best');
+grid on;

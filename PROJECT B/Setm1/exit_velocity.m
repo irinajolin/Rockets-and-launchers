@@ -1,4 +1,4 @@
-function [ve,Pr] = exit_velocity(ve,R0, molar, Tc, gamma, Pc, Pe)
+function [ve,Pr] = exit_velocity(ve,Pr,R0, molar, Tc, gamma, Pc, Pe)
 % Nina Cid 
 % Exit velocity function from 1-Rockets-Ideal rocket engine.key page 47
 % Inputs:
@@ -9,9 +9,9 @@ function [ve,Pr] = exit_velocity(ve,R0, molar, Tc, gamma, Pc, Pe)
 % Pc
 % Pe 
 %tenemos las presiones y queremos ve
-    if isempty(ve) && ~isempty(Pe) && ~isempty(Pc)
+    if isempty(ve) && ~isempty(Pc) && ~isempty(Pe)
         Pr=Pe./Pc;
-        ve = sqrt(((2*gamma*R0*Tc)/((gamma-1)*molar))*(1-(Pe/Pc)^((gamma-1)/gamma)));
+        ve = sqrt(((2*gamma*R0*Tc)/((gamma-1)*molar))*(1-(Pe./Pc).^((gamma-1)/gamma)));
     % tenemos ve y queremos la relacion de presiones 
     elseif isempty(Pe) && isempty(Pc) && ~isempty(ve)
         F4= @(x) sqrt(((2*gamma*R0*Tc)/((gamma-1)*molar))*(1-(x)^((gamma-1)/gamma)))-ve;
