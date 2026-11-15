@@ -1,1 +1,25 @@
+clear;
+clc;
+close all;
+
+% PROBLEM 1A - STARSHIP CO2 EMISSIONS
+
+% Propellant masses - Super Heavy
+m_CH4 = 816466.266;     % kg
+m_O2  = 2812272.694;   % kg
+
+% Molecular masses
+M_CH4 = 16;    % kg/kmol
+M_O2  = 32;    % kg/kmol
+M_CO2 = 44;    % kg/kmol
+
+
+% Calculate CO2 emissions
+[m_CO2,m_CO2_total] = combustion_methane(m_CH4,m_O2,M_CH4, M_O2,M_CO2);
+
+% Results
+fprintf('Direct CO2 emissions = %.2f tonnes\n',m_CO2/1000);
+
+fprintf('CO2 if all CO is oxidized = %.2f tonnes\n', ...
+        m_CO2_total/1000);
 
