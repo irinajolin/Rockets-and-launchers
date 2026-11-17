@@ -24,4 +24,4 @@ m_products = m_CO2 + m_CO + m_H2O;
 % 6. Relative mass conservation error
 error_comb = abs(m_reactants-m_products)/m_reactants;
 
-en
+end
