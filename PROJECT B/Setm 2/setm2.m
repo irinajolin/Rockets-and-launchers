@@ -235,6 +235,35 @@ title('Estimated CO2 emissions from Starlink launches');
 
 grid on;
 
+%% PROBLEMA 2
+
+%assuming that the outlet temperature is equal to chamber temp
+% H2 + 1/2 O2 --> H2O
+
+T0 = 298; % kelvin, chamber temperature 
+OF_ratio = 6; % trio 1 kg de H2 i 6 kg O2
+Pc = 206; % bar, chamber pressurehe
+Ar = 77.5; %area ratio
+Dt = 0.27; %throat diamater in m
+
+M_H2 = HGSsingle('H2', 'Mm', T0); %massa molar de H2 en g/mol
+M_O2 = HGSsingle('O2', 'Mm', T0); %massa molar de O2 en g/mol
+
+n_H2 = 1/M_H2; %mols de H2
+n_O2 = 6/M_O2; %mols de O2
+
+species = {'H2','O2','H2O','OH','H','O'};
+n0 = [n_H2, n_O2, 0, 0, 0, 0];
+
+[Tc,species,n,flag] = HGStp(species, n0, 'T', T0, Pc);
+
+fprintf('\n PROBLEM 2 \n')
+fprintf('Temperature at chamber: %3.fºK \n', Tc)
+
+
+
+
+
 
 
 
