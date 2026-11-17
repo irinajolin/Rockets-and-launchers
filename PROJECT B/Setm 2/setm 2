@@ -97,7 +97,7 @@ Rs_CO2 = R0/M_CO2;   % J/(kg*K)
 [rho_CO2,~,~,~,~] = ideal_gas([],Rs_CO2,P_ref,T_ref,[],m_CO2_total);
 
 % Calculate CO2 volume
-[~,~,~,V_CO2,~] = vale ponme uideal_gas(rho_CO2,Rs_CO2,P_ref,T_ref,[],m_CO2_total);
+[~,~,~,V_CO2,~] = ideal_gas(rho_CO2,Rs_CO2,P_ref,T_ref,[],m_CO2_total);
 
 % Swimming pool comparison
 V_pool = 50*25*2;     % m^3
@@ -109,4 +109,117 @@ fprintf('\nCO2 COMPARISON\n');
 fprintf('CO2 density = %.3f kg/m3\n',rho_CO2);
 fprintf('CO2 volume = %.2f m3\n',V_CO2);
 fprintf('Equivalent swimming pools = %.2f\n',n_pools);
+
+
+
+% PROBLEM 1B - STARLINK CO2 EMISSIONS
+
+% Number of Starlink launches, 2019-2026
+% Cut-off: November 17, 2026
+
+years = 2019:2026;
+
+N_falcon9 = [2 14 17 34 63 89 122 85];
+N_starship = [0 0 0 0 0 0 0 2];
+
+N_F9_total = sum(N_falcon9);
+N_starship_total = sum(N_starship);
+
+% 1. FALCON 9 PROPELLANTS
+
+% Reference values - Lawrence Berkeley National Laboratory
+m_RP1_F9 = 155893;  % kg per launch
+m_LOX_F9 = 362607;  % kg per launch
+
+m_prop_F9 = m_RP1_F9 + m_LOX_F9;
+
+% Molecular masses [kg/kmol]
+M_RP1 = 170;  % C12H26
+M_O2 = 32;
+M_CO2 = 44;
+M_H2O = 18;
+
+% 2. FALCON 9 COMBUSTION
+
+[m_CO2_F9,m_O2_required_F9,m_H2O_F9] = ...
+    combustion_RP1(m_RP1_F9,M_RP1,M_O2,M_CO2,M_H2O);
+
+% Potential CO2 from all Falcon 9 Starlink launches
+m_CO2_F9_total = N_F9_total*m_CO2_F9;
+
+% 3. STARSHIP COMBUSTION
+
+% Reuse the potential CO2 calculated in Problem 1A
+m_CO2_starship_launch = m_CO2_total;
+
+% Potential CO2 from Starship Starlink launches
+m_CO2_starship_total = ...
+    N_starship_total*m_CO2_starship_launch;
+
+% 4. TOTAL STARLINK CO2
+
+m_CO2_starlink = ...
+    m_CO2_F9_total + m_CO2_starship_total;
+
+% 5. ROAD TRANSPORT COMPARISON
+
+% Petrol car emissions: 170 g CO2/km
+emissions_car = 0.170;  % kg/km
+
+km_equivalent = m_CO2_starlink/emissions_car;
+
+% 6. VERIFICATION
+
+% Conservation of mass in complete RP-1 oxidation
+error_RP1 = abs((m_RP1_F9+m_O2_required_F9) ...
+             - (m_CO2_F9+m_H2O_F9));
+
+% Compare actual rocket O/F with stoichiometric O/F
+OF_F9 = m_LOX_F9/m_RP1_F9;
+
+OF_stoich = m_O2_required_F9/m_RP1_F9;
+
+% 7. RESULTS
+
+fprintf('\n--- PROBLEM 1B: STARLINK ---\n');
+
+fprintf('Falcon 9 launches = %d\n',N_F9_total);
+fprintf('Starship launches = %d\n',N_starship_total);
+
+fprintf('\nFALCON 9\n');
+fprintf('Propellant per launch = %.2f tonnes\n', ...
+    m_prop_F9/1000);
+fprintf('RP-1 per launch = %.2f tonnes\n', ...
+    m_RP1_F9/1000);
+fprintf('CO2 per launch = %.2f tonnes\n', ...
+    m_CO2_F9/1000);
+fprintf('Total Falcon 9 CO2 = %.2f tonnes\n', ...
+    m_CO2_F9_total/1000);
+
+fprintf('\nSTARSHIP\n');
+fprintf('Total Starship CO2 = %.2f tonnes\n', ...
+    m_CO2_starship_total/1000);
+
+fprintf('\nTOTAL STARLINK\n');
+fprintf('Total CO2 = %.2f tonnes\n', ...
+    m_CO2_starlink/1000);
+fprintf('Equivalent car distance = %.2f km\n', ...
+    km_equivalent);
+
+fprintf('\nVERIFICATION\n');
+fprintf('RP-1 mass error = %.3e kg\n',error_RP1);
+fprintf('Falcon 9 O/F = %.3f\n',OF_F9);
+fprintf('Stoichiometric O/F = %.3f\n',OF_stoich);
+
+% 8. YEARLY CO2 EMISSIONS
+
+m_CO2_year = N_falcon9*m_CO2_F9 + N_starship*m_CO2_starship_launch;
+
+figure;
+bar(years,m_CO2_year/1e6);
+xlabel('Year');
+ylabel('Potential CO2 emissions [thousand tonnes]');
+title('Estimated Starlink launch CO2 emissions by year');
+grid on;
+
 
