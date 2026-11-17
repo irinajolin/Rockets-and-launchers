@@ -8,11 +8,17 @@ close all;
 m_CH4 = 816466.266;     % kg
 m_O2  = 2812272.694;   % kg
 
+% Propellant capacities - SpaceX
+m_prop_booster = 3650e3;   % kg
+m_prop_starship = 1600e3;  % kg
+
 % Molecular masses
 M_CH4 = 16;    % kg/kmol
 M_O2  = 32;    % kg/kmol
 M_CO2 = 44;    % kg/kmol
 
+% Reference Raptor mixture ratio - FAA 2019
+OF = 3.60;
 
 % Calculate CO2 emissions
 [m_CO2,m_CO2_total] = combustion_methane(m_CH4,m_O2,M_CH4, M_O2,M_CO2);
