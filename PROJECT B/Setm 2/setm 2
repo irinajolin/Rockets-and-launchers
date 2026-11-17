@@ -4,28 +4,109 @@ close all;
 
 % PROBLEM 1A - STARSHIP CO2 EMISSIONS
 
-% Propellant masses - Super Heavy
-m_CH4 = 816466.266;     % kg
-m_O2  = 2812272.694;   % kg
-
 % Propellant capacities - SpaceX
-m_prop_booster = 3650e3;   % kg
-m_prop_starship = 1600e3;  % kg
+m_prop_booster = 3650e3;    % kg
+m_prop_starship = 1600e3;   % kg
 
 % Molecular masses
 M_CH4 = 16;    % kg/kmol
 M_O2  = 32;    % kg/kmol
 M_CO2 = 44;    % kg/kmol
+M_CO = 28;      % kg/kmol
+M_H2O = 18;     % kg/kmol
 
 % Reference Raptor mixture ratio - FAA 2019
-OF = 3.60;
+OF = 3.60;    % m_O2/m_CH4
 
-% Calculate CO2 emissions
-[m_CO2,m_CO2_total] = combustion_methane(m_CH4,m_O2,M_CH4, M_O2,M_CO2);
 
-% Results
+
+%%PROBLEM 1 
+%a)
+% 1. CALCULATE METHANE AND OXYGEN MASSES --> 
+
+% Super Heavy
+[m_CH4_booster,m_O2_booster] = propellant_masses(m_prop_booster,OF);
+
+% Starship
+[m_CH4_starship,m_O2_starship] = propellant_masses(m_prop_starship,OF);
+
+
+% 2. CALCULATE CO2 EMISSIONS
+
+% Super Heavy
+[m_CO2_booster,m_CO2_total_booster] = combustion_methane(m_CH4_booster,m_O2_booster,M_CH4,M_O2,M_CO2);
+
+% Starship
+[m_CO2_starship,m_CO2_total_starship] = combustion_methane(m_CH4_starship,m_O2_starship,M_CH4,M_O2,M_CO2);
+
+
+% 3. TOTAL CO2 EMISSIONS
+
+m_CO2 = m_CO2_booster + m_CO2_starship;
+
+m_CO2_total = m_CO2_total_booster + m_CO2_total_starship;
+
+
+% 4. RESULTS
+
+fprintf('SUPER HEAVY\n');
+fprintf('Direct CO2 emissions = %.2f tonnes\n',m_CO2_booster/1000);
+fprintf('CO2 if all CO is oxidized = %.2f tonnes\n\n', ...
+        m_CO2_total_booster/1000);
+
+fprintf('STARSHIP\n');
+fprintf('Direct CO2 emissions = %.2f tonnes\n',m_CO2_starship/1000);
+fprintf('CO2 if all CO is oxidized = %.2f tonnes\n\n', ...
+        m_CO2_total_starship/1000);
+
+fprintf('TOTAL STARSHIP / SUPER HEAVY\n');
 fprintf('Direct CO2 emissions = %.2f tonnes\n',m_CO2/1000);
-
 fprintf('CO2 if all CO is oxidized = %.2f tonnes\n', ...
         m_CO2_total/1000);
+
+% MASS CONSERVATION VERIFICATION
+
+% Super Heavy
+[error_prop_booster,error_comb_booster] = ...
+    mass_conservation(m_prop_booster,m_CH4_booster,m_O2_booster, ...
+    m_CO2_booster,M_CH4,M_CO2,M_CO,M_H2O);
+
+% Starship
+[error_prop_starship,error_comb_starship] = ...
+    mass_conservation(m_prop_starship,m_CH4_starship,m_O2_starship, ...
+    m_CO2_starship,M_CH4,M_CO2,M_CO,M_H2O);
+
+fprintf('\nMASS CONSERVATION VERIFICATION\n');
+fprintf('Super Heavy propellant error = %.3e kg\n',error_prop_booster);
+fprintf('Super Heavy combustion error = %.3e\n',error_comb_booster);
+fprintf('Starship propellant error = %.3e kg\n',error_prop_starship);
+fprintf('Starship combustion error = %.3e\n',error_comb_starship);
+
+
+% CO2 COMPARISON - PROBLEM 1A
+
+% Reference conditions
+T_ref = 298.15;     % K
+P_ref = 101325;     % Pa
+
+% Specific gas constant for CO2
+R0 = 8314.462618;   % J/(kmol*K)
+Rs_CO2 = R0/M_CO2;   % J/(kg*K)
+
+% Calculate CO2 density
+[rho_CO2,~,~,~,~] = ideal_gas([],Rs_CO2,P_ref,T_ref,[],m_CO2_total);
+
+% Calculate CO2 volume
+[~,~,~,V_CO2,~] = vale ponme uideal_gas(rho_CO2,Rs_CO2,P_ref,T_ref,[],m_CO2_total);
+
+% Swimming pool comparison
+V_pool = 50*25*2;     % m^3
+
+n_pools = V_CO2/V_pool;
+
+% Results
+fprintf('\nCO2 COMPARISON\n');
+fprintf('CO2 density = %.3f kg/m3\n',rho_CO2);
+fprintf('CO2 volume = %.2f m3\n',V_CO2);
+fprintf('Equivalent swimming pools = %.2f\n',n_pools);
 
