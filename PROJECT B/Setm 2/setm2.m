@@ -281,20 +281,20 @@ fprintf('Specific R:%.4fkJ/(kg K)\n', Rg);
 fprintf('Gamma:%.4f\n', gamma);
 
 %APARTAT C 
-[~, M] = area_ratio(Ar,[],gamma);
-[Pr,~]= pressure_ratio (M, [],gamma);
+[~, Me] = area_ratio(Ar,[],gamma);
+[Pr,~]= pressure_ratio (Me, [],gamma);
 Pe = Pc/Pr;
 
 fprintf('Exit pressure: %.4f bar\n', Pe);
 
 
 %APARTAT D
-[ve,~] = exit_velocity([],Pr,R0, M, Tc, gamma, Pc, Pe);
+[ve,~] = exit_velocity([],Pr,R0, M_mix, Tc, gamma, Pc, Pe);
 
 fprintf('Exit velocity: %.4f m/s\n', ve);
 
 %APARTAT E
-[~,Cstar] = cee_star(R0,M,Tc,gamma);
+[~,Cstar] = cee_star(R0,M_mix,Tc,gamma);
 fprintf('Ceestar: %.4f\n', Cstar);
 
 %APARTAT F
@@ -307,5 +307,25 @@ Pa = 101325;
 Ae = Ar*At;
 [T, ~, ~] = thrust(mass_flow, ve, Ae, Pe*1e5, Pa);
 fprintf('Total thrust: %.2f N\n', T);
+
+%APARTAT H
+fprintf('\nDades de SR-25:\n')
+fprintf('Thrust at vacuum: 2279 kN\n')
+fprintf('Thrust at sea-level: 1,860 kN\n')
+fprintf('Chamber pressure: 20.64 MPa\n')
+fprintf('Chamber temperature: 3653 ºK\n')
+fprintf('Mass flow: 514.49 kg/s\n')
+
+fprintf('Exit Mach number: %.3f\n\n', Me)
+
+%APARTAT I
+Pr_exit = (Pe*1e5)/Pa;
+[Pe_sum] = ratio_summerfield(Pe, Pa);
+[Pr_sch, ~] = schmucker([], Me,  Pr_exit);
+
+
+fprintf('Schmucker limit: %.4f\n', Pr_sch);
+fprintf('Exit pressure ratio Pe/Pa: %.4f\n', Pr_exit);
+
 
 
