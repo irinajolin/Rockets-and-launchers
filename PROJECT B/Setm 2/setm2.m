@@ -2,8 +2,6 @@ clear;
 clc;
 close all;
 
-% HGS CONFIGURATION
-
 % PROBLEM 1A - STARSHIP CO2 EMISSIONS
 
 % Propellant capacities - SpaceX [kg]
